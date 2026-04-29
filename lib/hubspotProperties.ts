@@ -44,6 +44,7 @@ export const CONTACT_PROPERTY_MAP = {
   tipoDeContacto: "tipo_de_contacto",
   observaciones: "observaciones",
   idDeNegocio: "id_de_negocio",
+  rutRepresentanteLegal: "rut_representante_legal",
 } as const;
 
 export const DEAL_PROPERTIES = Object.values(DEAL_PROPERTY_MAP);

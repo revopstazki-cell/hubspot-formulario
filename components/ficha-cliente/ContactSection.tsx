@@ -19,22 +19,28 @@ type ContactFieldPrefix =
 
 type ContactSectionProps = {
   title: string;
+  note?: string;
   addLabel: string;
   fieldPrefix: ContactFieldPrefix;
   contacts: ContactDraft[];
   cargoOptions: PropertyOption[];
   typeOptions: PropertyOption[];
   defaultTypeValue: string;
+  showRut?: boolean;
   errors: Record<string, string>;
   onChange: (contacts: ContactDraft[]) => void;
   createContact: () => ContactDraft;
 };
 
 type ContactSearchInputProps = {
+  contact: ContactDraft;
   onSelect: (contact: ContactSearchResult) => void;
+  onClearSelection: () => void;
 };
 
-function contactDisplayName(contact: ContactSearchResult) {
+function contactDisplayName(
+  contact: Pick<ContactDraft | ContactSearchResult, "firstname" | "lastname" | "email">,
+) {
   return [contact.firstname, contact.lastname].filter(Boolean).join(" ").trim();
 }
 
@@ -42,15 +48,22 @@ function mergeTypeValues(values: string[], defaultValue: string) {
   return Array.from(new Set([defaultValue, ...values].filter(Boolean)));
 }
 
-function ContactSearchInput({ onSelect }: ContactSearchInputProps) {
+function ContactSearchInput({
+  contact,
+  onSelect,
+  onClearSelection,
+}: ContactSearchInputProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ContactSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isChanging, setIsChanging] = useState(false);
+  const selectedLabel = contactDisplayName(contact) || contact.email;
+  const hasSelection = Boolean(contact.selectedContactId) && !isChanging;
 
   useEffect(() => {
     const trimmedQuery = query.trim();
 
-    if (trimmedQuery.length < 2) {
+    if (hasSelection || trimmedQuery.length < 2) {
       return;
     }
 
@@ -80,7 +93,45 @@ function ContactSearchInput({ onSelect }: ContactSearchInputProps) {
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [query]);
+  }, [hasSelection, query]);
+
+  if (hasSelection) {
+    return (
+      <div className="md:col-span-2">
+        <div className="rounded-lg border border-[#7B3FF2]/20 bg-[#7B3FF2]/5 px-4 py-3 text-sm">
+          <div className="font-medium text-slate-950">
+            Contacto seleccionado desde HubSpot
+          </div>
+          <div className="mt-1 text-slate-700">{selectedLabel}</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsChanging(true);
+                setQuery("");
+                setResults([]);
+              }}
+              className="rounded-lg bg-[#7B3FF2] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6B32D9]"
+            >
+              Cambiar contacto
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsChanging(false);
+                setQuery("");
+                setResults([]);
+                onClearSelection();
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
+            >
+              Limpiar selección
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative md:col-span-2">
@@ -89,6 +140,10 @@ function ContactSearchInput({ onSelect }: ContactSearchInputProps) {
         name="contactSearch"
         value={query}
         onChange={(value) => {
+          if (contact.selectedContactId) {
+            onClearSelection();
+          }
+
           setQuery(value);
 
           if (value.trim().length < 2) {
@@ -109,7 +164,8 @@ function ContactSearchInput({ onSelect }: ContactSearchInputProps) {
                 type="button"
                 onClick={() => {
                   onSelect(contact);
-                  setQuery(contactDisplayName(contact) || contact.email);
+                  setIsChanging(false);
+                  setQuery("");
                   setResults([]);
                 }}
                 className="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm transition hover:bg-[#7B3FF2]/5 last:border-b-0"
@@ -135,12 +191,14 @@ function ContactSearchInput({ onSelect }: ContactSearchInputProps) {
 
 export function ContactSection({
   title,
+  note,
   addLabel,
   fieldPrefix,
   contacts,
   cargoOptions,
   typeOptions,
   defaultTypeValue,
+  showRut,
   errors,
   onChange,
   createContact,
@@ -193,6 +251,12 @@ export function ContactSection({
         </button>
       </div>
 
+      {note ? (
+        <div className="mb-4 rounded-lg border border-[#7B3FF2]/15 bg-[#7B3FF2]/5 px-4 py-3 text-sm leading-6 text-slate-600">
+          {note}
+        </div>
+      ) : null}
+
       {contacts.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
           No hay contactos agregados.
@@ -227,8 +291,12 @@ export function ContactSection({
 
             <div className="grid gap-4 md:grid-cols-2">
               <ContactSearchInput
+                contact={contact}
                 onSelect={(selected) =>
                   updateContactFromSearch(contact.localId, selected)
+                }
+                onClearSelection={() =>
+                  updateContact(contact.localId, "selectedContactId", "")
                 }
               />
               <TextInput
@@ -280,6 +348,25 @@ export function ContactSection({
                 options={[{ label: "Selecciona un cargo", value: "" }, ...cargoOptions]}
                 error={errors[`${fieldPrefix}.${index}.cargo`]}
               />
+              {showRut ? (
+                <TextInput
+                  label="RUT representante legal"
+                  name={`${fieldPrefix}-${index}-rutRepresentanteLegal`}
+                  value={contact.rutRepresentanteLegal}
+                  onChange={(value) =>
+                    updateContact(
+                      contact.localId,
+                      "rutRepresentanteLegal",
+                      value,
+                    )
+                  }
+                  required
+                  error={
+                    errors[`${fieldPrefix}.${index}.rutRepresentanteLegal`]
+                  }
+                  helperText="Acepta formatos como 12.345.678-9 o 12345678-9."
+                />
+              ) : null}
               <CheckboxGroup
                 label="Tipo de contacto"
                 options={typeOptions}

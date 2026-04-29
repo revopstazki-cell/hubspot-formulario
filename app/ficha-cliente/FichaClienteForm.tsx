@@ -79,6 +79,10 @@ function isValidInternationalPhone(value: string) {
   return /^\+[1-9]\d{6,14}$/.test(compactValue);
 }
 
+function isValidRut(value: string) {
+  return /^\d{1,2}\.?\d{3}\.?\d{3}-?[\dkK]$/.test(value.trim());
+}
+
 function normalizeLabel(value: string) {
   return value
     .normalize("NFD")
@@ -130,8 +134,18 @@ function contactHasData(contact: ContactDraft) {
       contact.email.trim() ||
       contact.phone.trim() ||
       contact.cargo.trim() ||
+      contact.rutRepresentanteLegal.trim() ||
       contact.tipoDeContacto.length > 0,
   );
+}
+
+function withDefaultType(contact: ContactDraft, typeValue: string) {
+  return {
+    ...contact,
+    tipoDeContacto: Array.from(
+      new Set([typeValue, ...contact.tipoDeContacto].filter(Boolean)),
+    ),
+  };
 }
 
 export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
@@ -275,6 +289,21 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     }
   }
 
+  function ensureContactDefaults(formState: ClientFormState) {
+    return {
+      ...formState,
+      cobranzaContacts: formState.cobranzaContacts.map((contact) =>
+        withDefaultType(contact, cobranzaTypeValue),
+      ),
+      facturacionContacts: formState.facturacionContacts.map((contact) =>
+        withDefaultType(contact, facturacionTypeValue),
+      ),
+      legalContacts: formState.legalContacts.map((contact) =>
+        withDefaultType(contact, legalTypeValue),
+      ),
+    };
+  }
+
   function validateForm() {
     const errors: Record<string, string> = {};
     const normalizedForm = withPrimaryContactDealFields(form);
@@ -300,6 +329,30 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     validateContactList("facturacionContacts", form.facturacionContacts, errors);
     validateContactList("legalContacts", form.legalContacts, errors);
 
+    if (form.legalContacts.length === 0) {
+      errors.legalContacts = "Debes agregar al menos un representante legal.";
+    }
+
+    for (const [index, contact] of form.legalContacts.entries()) {
+      if (!contact.firstname.trim()) {
+        errors[`legalContacts.${index}.firstname`] =
+          "El nombre es obligatorio.";
+      }
+
+      if (!contact.selectedContactId && !contact.email.trim()) {
+        errors[`legalContacts.${index}.email`] =
+          "Agrega correo o selecciona un contacto existente.";
+      }
+
+      if (!contact.rutRepresentanteLegal.trim()) {
+        errors[`legalContacts.${index}.rutRepresentanteLegal`] =
+          "El RUT del representante legal es obligatorio.";
+      } else if (!isValidRut(contact.rutRepresentanteLegal)) {
+        errors[`legalContacts.${index}.rutRepresentanteLegal`] =
+          "Ingresa un RUT valido, por ejemplo 12.345.678-9.";
+      }
+    }
+
     if (personeriaFile && personeriaFile.size > MAX_FILE_SIZE_BYTES) {
       errors.personeriaFile = "El archivo no puede superar 10 MB.";
     }
@@ -323,7 +376,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     setSaving(true);
 
     try {
-      const conditionalForm: ClientFormState = {
+      const conditionalForm: ClientFormState = ensureContactDefaults({
         ...form,
         linkFichaCliente: generatedLink,
         nombrePlataformaProveedores: showSupplierPlatform
@@ -339,7 +392,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           : "",
         frecuenciaSolicitudHES: hasRequirementHES ? form.frecuenciaSolicitudHES : "",
         frecuenciaSolicitudEDP: hasRequirementEDP ? form.frecuenciaSolicitudEDP : "",
-      };
+      });
       const normalizedForm = withPrimaryContactDealFields(conditionalForm);
       const body = new FormData();
       body.append("payload", JSON.stringify(normalizedForm));
@@ -544,6 +597,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
       <ContactSection
         title="Contactos de Facturación"
+        note="Si el contacto de facturación es el mismo que el de cobranza/proveedores, puedes marcar ambos tipos de contacto en el mismo registro y no es necesario agregarlo nuevamente."
         addLabel="+ Agregar contacto de facturación"
         fieldPrefix="facturacionContacts"
         contacts={form.facturacionContacts}
@@ -577,20 +631,16 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         cargoOptions={cargoOptions}
         typeOptions={typeOptions}
         defaultTypeValue={legalTypeValue}
+        showRut
         errors={fieldErrors}
         createContact={() => createContact(legalTypeValue)}
         onChange={(contacts) => updateContactList("legalContacts", contacts)}
       />
-
-      <FormSection title="Datos legales del representante">
-        <TextInput
-          label="RUT representante legal"
-          name="rutRepresentanteLegal"
-          value={form.rutRepresentanteLegal}
-          onChange={(value) => updateField("rutRepresentanteLegal", value)}
-          error={fieldErrors.rutRepresentanteLegal}
-        />
-      </FormSection>
+      {fieldErrors.legalContacts ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {fieldErrors.legalContacts}
+        </div>
+      ) : null}
 
       <FormSection title="Archivo de personería">
         <FileUpload
@@ -599,7 +649,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           existingValue={form.personeriaArchivo}
           onChange={setPersoneriaFile}
           error={fieldErrors.personeriaFile}
-          helperText="Subiremos el archivo desde backend a HubSpot y guardaremos su referencia en el deal."
+          helperText="El archivo se sube desde el backend y se guarda en la propiedad personeria_ del deal."
         />
       </FormSection>
 
@@ -662,8 +712,8 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
       <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div className="text-sm text-slate-500">
-          Solo enviaremos a HubSpot campos con contenido. No sobreescribimos datos
-          existentes con valores vacios.
+          Los datos enviados actualizarán la información existente en HubSpot. Si
+          dejas un campo vacío, este puede sobrescribir el valor anterior.
         </div>
         <button
           type="submit"

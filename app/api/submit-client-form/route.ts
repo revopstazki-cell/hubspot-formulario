@@ -6,7 +6,7 @@ import {
   type ClientFormState,
 } from "@/lib/clientForm";
 import {
-  getPersoneriaDealValue,
+  getPersoneriaDealValueForProperty,
   updateDeal,
   uploadFileToHubSpot,
   upsertContactForDeal,
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     if (personeriaFile instanceof File && personeriaFile.size > 0) {
       const upload = await uploadFileToHubSpot(personeriaFile);
       dealProperties[DEAL_PROPERTY_MAP.personeriaArchivo] =
-        getPersoneriaDealValue(upload);
+        await getPersoneriaDealValueForProperty(upload);
     }
 
     await updateDeal(payload.dealId, dealProperties);

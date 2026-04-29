@@ -14,6 +14,7 @@ export type ContactDraft = {
   email: string;
   phone: string;
   cargo: string;
+  rutRepresentanteLegal: string;
   tipoDeContacto: string[];
 };
 
@@ -72,6 +73,7 @@ export type ContactSearchResult = {
   email: string;
   phone: string;
   cargo: string;
+  rutRepresentanteLegal: string;
   tipoDeContacto: string[];
   tipo_de_contacto?: string[];
 };
@@ -89,6 +91,7 @@ export function createEmptyContactDraft(defaultRoles: string[] = []): ContactDra
     email: "",
     phone: "",
     cargo: "",
+    rutRepresentanteLegal: "",
     tipoDeContacto: defaultRoles,
   };
 }
@@ -175,6 +178,7 @@ function hasContactData(contact: ContactDraft) {
       contact.email.trim() ||
       contact.phone.trim() ||
       contact.cargo.trim() ||
+      contact.rutRepresentanteLegal.trim() ||
       contact.tipoDeContacto.length > 0,
   );
 }
@@ -191,6 +195,7 @@ export function mapHubSpotContactToDraft(
           email: contact.email,
           phone: contact.phone,
           cargo: contact.cargo,
+          rut_representante_legal: contact.rutRepresentanteLegal,
           tipo_de_contacto: joinHubSpotMultiValue(contact.tipoDeContacto),
         };
 
@@ -202,6 +207,9 @@ export function mapHubSpotContactToDraft(
     email: String(properties[CONTACT_PROPERTY_MAP.email] ?? ""),
     phone: String(properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
     cargo: String(properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
+    rutRepresentanteLegal: String(
+      properties[CONTACT_PROPERTY_MAP.rutRepresentanteLegal] ?? "",
+    ),
     tipoDeContacto: splitHubSpotMultiValue(
       String(properties[CONTACT_PROPERTY_MAP.tipoDeContacto] ?? ""),
     ),
@@ -213,6 +221,7 @@ function contactFromDealFields(params: {
   email: string;
   phone: string;
   cargo: string;
+  rutRepresentanteLegal?: string;
   role: string;
 }) {
   const name = splitFullName(params.fullName);
@@ -224,6 +233,7 @@ function contactFromDealFields(params: {
     email: params.email,
     phone: params.phone,
     cargo: params.cargo,
+    rutRepresentanteLegal: params.rutRepresentanteLegal ?? "",
   };
 }
 
@@ -287,6 +297,7 @@ export function mapHubSpotDealToFormState(
     email: form.correoRepresentanteLegal,
     phone: "",
     cargo: "",
+    rutRepresentanteLegal: form.rutRepresentanteLegal,
     role: LEGAL_REPRESENTATIVE_ROLE,
   });
 
@@ -345,7 +356,7 @@ export function cleanObject<T extends Record<string, unknown>>(input: T) {
         return value.length > 0;
       }
 
-      return value !== undefined && value !== null && value !== "";
+      return value !== undefined && value !== null;
     }),
   ) as Partial<T>;
 }
@@ -366,6 +377,7 @@ export function normalizeContactPayload(contact: ContactDraft) {
     email: normalizeText(contact.email),
     phone: normalizePhone(contact.phone),
     cargo: normalizeText(contact.cargo),
+    rutRepresentanteLegal: normalizeText(contact.rutRepresentanteLegal),
     tipoDeContacto: contact.tipoDeContacto
       .map(normalizeText)
       .filter(Boolean),
@@ -431,8 +443,6 @@ export function normalizeDealPayload(form: ClientFormState) {
     ),
     [DEAL_PROPERTY_MAP.nombreRepresentanteLegal]:
       normalizeText(normalizedForm.nombreRepresentanteLegal),
-    [DEAL_PROPERTY_MAP.rutRepresentanteLegal]:
-      normalizeText(normalizedForm.rutRepresentanteLegal),
     [DEAL_PROPERTY_MAP.correoRepresentanteLegal]:
       normalizeText(normalizedForm.correoRepresentanteLegal),
     [DEAL_PROPERTY_MAP.requerimientoFacturacion]: joinHubSpotMultiValue(

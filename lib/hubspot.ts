@@ -146,9 +146,7 @@ export async function getPropertyOptions(
   objectType: "contacts" | "deals",
   propertyName: string,
 ) {
-  const property = await hubspotFetch<HubSpotPropertyResponse>(
-    `/crm/v3/properties/${objectType}/${propertyName}`,
-  );
+  const property = await getPropertyDefinition(objectType, propertyName);
 
   return (property.options ?? [])
     .filter((option) => !option.hidden)
@@ -157,6 +155,15 @@ export async function getPropertyOptions(
       label: option.label,
       value: option.value,
     }));
+}
+
+export async function getPropertyDefinition(
+  objectType: "contacts" | "deals",
+  propertyName: string,
+) {
+  return hubspotFetch<HubSpotPropertyResponse>(
+    `/crm/v3/properties/${objectType}/${propertyName}`,
+  );
 }
 
 export async function searchContacts(query: string) {
@@ -181,6 +188,9 @@ export async function searchContacts(query: string) {
     email: String(contact.properties[CONTACT_PROPERTY_MAP.email] ?? ""),
     phone: String(contact.properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
     cargo: String(contact.properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
+    rutRepresentanteLegal: String(
+      contact.properties[CONTACT_PROPERTY_MAP.rutRepresentanteLegal] ?? "",
+    ),
     tipoDeContacto: splitHubSpotMultiValue(
       String(contact.properties[CONTACT_PROPERTY_MAP.tipoDeContacto] ?? ""),
     ),
@@ -282,6 +292,8 @@ function getContactPropertiesPayload(
     [CONTACT_PROPERTY_MAP.email]: normalizedContact.email,
     [CONTACT_PROPERTY_MAP.phone]: normalizedContact.phone,
     [CONTACT_PROPERTY_MAP.cargo]: normalizedContact.cargo,
+    [CONTACT_PROPERTY_MAP.rutRepresentanteLegal]:
+      normalizedContact.rutRepresentanteLegal,
     [CONTACT_PROPERTY_MAP.idDeNegocio]: dealId,
     [CONTACT_PROPERTY_MAP.tipoDeContacto]: joinHubSpotMultiValue(roles),
   });
@@ -396,4 +408,16 @@ export async function upsertContactForDeal(params: {
 
 export function getPersoneriaDealValue(upload: HubSpotFileUploadResult) {
   return String(upload.id || upload.url || upload.defaultHostingUrl || "");
+}
+
+export async function getPersoneriaDealValueForProperty(
+  upload: HubSpotFileUploadResult,
+) {
+  const property = await getPropertyDefinition("deals", "personeria_");
+
+  if (property.fieldType === "file") {
+    return String(upload.id);
+  }
+
+  return String(upload.url || upload.defaultHostingUrl || upload.id || "");
 }
