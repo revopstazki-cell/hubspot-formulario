@@ -297,10 +297,10 @@ function getContactPropertiesPayload(
   contact: ContactDraft,
   dealId: string,
   roles: string[],
+  options: { includeEmptyValues?: boolean } = {},
 ) {
   const normalizedContact = normalizeContactPayload(contact);
-
-  return cleanObject({
+  const properties = {
     [CONTACT_PROPERTY_MAP.firstname]: normalizedContact.firstname,
     [CONTACT_PROPERTY_MAP.lastname]: normalizedContact.lastname,
     [CONTACT_PROPERTY_MAP.email]: normalizedContact.email,
@@ -310,7 +310,15 @@ function getContactPropertiesPayload(
       normalizedContact.rutRepresentanteLegal,
     [CONTACT_PROPERTY_MAP.idDeNegocio]: dealId,
     [CONTACT_PROPERTY_MAP.tipoDeContacto]: joinHubSpotMultiValue(roles),
-  });
+  };
+
+  if (options.includeEmptyValues) {
+    return cleanObject(properties);
+  }
+
+  return Object.fromEntries(
+    Object.entries(properties).filter(([, value]) => value.trim() !== ""),
+  );
 }
 
 async function createContact(properties: Record<string, string>) {
@@ -391,6 +399,7 @@ export async function upsertContactForDeal(params: {
       normalizedContact,
       dealId,
       mergedRoles,
+      { includeEmptyValues: true },
     );
     await updateContact(existing.id, properties);
     await associateContactToDeal(existing.id, dealId);
@@ -409,7 +418,9 @@ export async function upsertContactForDeal(params: {
   }
 
   const created = await createContact(
-    getContactPropertiesPayload(normalizedContact, dealId, mergedRoles),
+    getContactPropertiesPayload(normalizedContact, dealId, mergedRoles, {
+      includeEmptyValues: false,
+    }),
   );
   await associateContactToDeal(created.id, dealId);
 

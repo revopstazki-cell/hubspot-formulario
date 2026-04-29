@@ -9,7 +9,7 @@ export const FORM_SAVE_ERROR =
   "No pudimos completar el guardado. Intenta nuevamente.";
 
 export const CONTACT_SAVE_ERROR =
-  "No pudimos guardar este contacto. Revisa sus datos e intenta nuevamente.";
+  "No pudimos guardar o asociar este contacto en HubSpot. Si ya existe, búscalo arriba y selecciónalo; si es nuevo, revisa el correo y deja solo datos válidos.";
 
 export const FILE_UPLOAD_ERROR =
   "No pudimos subir el archivo de personería. Prueba con otro archivo o intenta nuevamente.";
