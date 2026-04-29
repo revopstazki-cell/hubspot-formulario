@@ -14,6 +14,7 @@ export type ContactDraft = {
   email: string;
   phone: string;
   cargo: string;
+  observaciones: string;
   rutRepresentanteLegal: string;
   tipoDeContacto: string[];
 };
@@ -73,6 +74,7 @@ export type ContactSearchResult = {
   email: string;
   phone: string;
   cargo: string;
+  observaciones: string;
   rutRepresentanteLegal: string;
   tipoDeContacto: string[];
   tipo_de_contacto?: string[];
@@ -91,6 +93,7 @@ export function createEmptyContactDraft(defaultRoles: string[] = []): ContactDra
     email: "",
     phone: "",
     cargo: "",
+    observaciones: "",
     rutRepresentanteLegal: "",
     tipoDeContacto: defaultRoles,
   };
@@ -170,7 +173,7 @@ export function getFullName(contact: ContactDraft) {
   return [contact.firstname, contact.lastname].filter(Boolean).join(" ").trim();
 }
 
-function hasContactData(contact: ContactDraft) {
+export function hasContactData(contact: ContactDraft) {
   return Boolean(
     contact.selectedContactId ||
       contact.firstname.trim() ||
@@ -178,9 +181,13 @@ function hasContactData(contact: ContactDraft) {
       contact.email.trim() ||
       contact.phone.trim() ||
       contact.cargo.trim() ||
-      contact.rutRepresentanteLegal.trim() ||
-      contact.tipoDeContacto.length > 0,
+      contact.observaciones.trim() ||
+      contact.rutRepresentanteLegal.trim(),
   );
+}
+
+export function getFirstContactForDealSummary(contacts: ContactDraft[]) {
+  return contacts.find(hasContactData);
 }
 
 export function mapHubSpotContactToDraft(
@@ -195,6 +202,7 @@ export function mapHubSpotContactToDraft(
           email: contact.email,
           phone: contact.phone,
           cargo: contact.cargo,
+          observaciones: contact.observaciones,
           rut_representante_legal: contact.rutRepresentanteLegal,
           tipo_de_contacto: joinHubSpotMultiValue(contact.tipoDeContacto),
         };
@@ -207,6 +215,9 @@ export function mapHubSpotContactToDraft(
     email: String(properties[CONTACT_PROPERTY_MAP.email] ?? ""),
     phone: String(properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
     cargo: String(properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
+    observaciones: String(
+      properties[CONTACT_PROPERTY_MAP.observaciones] ?? "",
+    ),
     rutRepresentanteLegal: String(
       properties[CONTACT_PROPERTY_MAP.rutRepresentanteLegal] ?? "",
     ),
@@ -221,6 +232,7 @@ function contactFromDealFields(params: {
   email: string;
   phone: string;
   cargo: string;
+  observaciones?: string;
   rutRepresentanteLegal?: string;
   role: string;
 }) {
@@ -233,6 +245,7 @@ function contactFromDealFields(params: {
     email: params.email,
     phone: params.phone,
     cargo: params.cargo,
+    observaciones: params.observaciones ?? "",
     rutRepresentanteLegal: params.rutRepresentanteLegal ?? "",
   };
 }
@@ -283,6 +296,7 @@ export function mapHubSpotDealToFormState(
     email: form.correoCobranza,
     phone: form.telefonoCobranza,
     cargo: form.cargoCobranza,
+    observaciones: form.observacionesCobranza,
     role: COBRANZA_ROLE,
   });
   const legacyFacturacionContact = contactFromDealFields({
@@ -326,9 +340,9 @@ export function mapHubSpotDealToFormState(
 }
 
 export function withPrimaryContactDealFields(form: ClientFormState) {
-  const cobranza = form.cobranzaContacts[0];
-  const facturacion = form.facturacionContacts[0];
-  const legal = form.legalContacts[0];
+  const cobranza = getFirstContactForDealSummary(form.cobranzaContacts);
+  const facturacion = getFirstContactForDealSummary(form.facturacionContacts);
+  const legal = getFirstContactForDealSummary(form.legalContacts);
 
   return {
     ...form,
@@ -336,6 +350,8 @@ export function withPrimaryContactDealFields(form: ClientFormState) {
     correoCobranza: cobranza?.email ?? form.correoCobranza,
     telefonoCobranza: cobranza?.phone ?? form.telefonoCobranza,
     cargoCobranza: cobranza?.cargo ?? form.cargoCobranza,
+    observacionesCobranza:
+      cobranza?.observaciones || form.observacionesCobranza,
     nombreFacturacion: facturacion
       ? getFullName(facturacion)
       : form.nombreFacturacion,
@@ -345,6 +361,8 @@ export function withPrimaryContactDealFields(form: ClientFormState) {
     nombreRepresentanteLegal: legal
       ? getFullName(legal)
       : form.nombreRepresentanteLegal,
+    rutRepresentanteLegal:
+      legal?.rutRepresentanteLegal ?? form.rutRepresentanteLegal,
     correoRepresentanteLegal: legal?.email ?? form.correoRepresentanteLegal,
   };
 }
@@ -377,6 +395,7 @@ export function normalizeContactPayload(contact: ContactDraft) {
     email: normalizeText(contact.email),
     phone: normalizePhone(contact.phone),
     cargo: normalizeText(contact.cargo),
+    observaciones: normalizeText(contact.observaciones),
     rutRepresentanteLegal: normalizeText(contact.rutRepresentanteLegal),
     tipoDeContacto: contact.tipoDeContacto
       .map(normalizeText)
@@ -443,6 +462,9 @@ export function normalizeDealPayload(form: ClientFormState) {
     ),
     [DEAL_PROPERTY_MAP.nombreRepresentanteLegal]:
       normalizeText(normalizedForm.nombreRepresentanteLegal),
+    [DEAL_PROPERTY_MAP.rutRepresentanteLegal]: normalizeText(
+      normalizedForm.rutRepresentanteLegal,
+    ),
     [DEAL_PROPERTY_MAP.correoRepresentanteLegal]:
       normalizeText(normalizedForm.correoRepresentanteLegal),
     [DEAL_PROPERTY_MAP.requerimientoFacturacion]: joinHubSpotMultiValue(

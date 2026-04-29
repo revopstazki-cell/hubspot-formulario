@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  getFirstContactForDealSummary,
+  getFullName,
   normalizeDealPayload,
   withPrimaryContactDealFields,
   type ClientFormState,
+  type ContactDraft,
 } from "@/lib/clientForm";
 import {
   CONTACT_SAVE_ERROR,
@@ -42,13 +45,25 @@ const DEAL_ERROR_FIELD_MAP: Record<string, string> = {
   [DEAL_PROPERTY_MAP.direccionFacturacion]: "direccionFacturacion",
   [DEAL_PROPERTY_MAP.comuna]: "comuna",
   [DEAL_PROPERTY_MAP.ciudadEmpresa]: "ciudadEmpresa",
+  [DEAL_PROPERTY_MAP.nombreCobranza]: "nombreCobranza",
+  [DEAL_PROPERTY_MAP.correoCobranza]: "correoCobranza",
+  [DEAL_PROPERTY_MAP.telefonoCobranza]: "telefonoCobranza",
+  [DEAL_PROPERTY_MAP.cargoCobranza]: "cargoCobranza",
+  [DEAL_PROPERTY_MAP.observacionesCobranza]: "observacionesCobranza",
   [DEAL_PROPERTY_MAP.existePlataformaProveedores]:
     "existePlataformaProveedores",
   [DEAL_PROPERTY_MAP.nombrePlataformaProveedores]:
     "nombrePlataformaProveedores",
   [DEAL_PROPERTY_MAP.comentarioPlataformaProveedores]:
     "comentarioPlataformaProveedores",
+  [DEAL_PROPERTY_MAP.nombreFacturacion]: "nombreFacturacion",
+  [DEAL_PROPERTY_MAP.correoFacturacion]: "correoFacturacion",
+  [DEAL_PROPERTY_MAP.telefonoFacturacion]: "telefonoFacturacion",
+  [DEAL_PROPERTY_MAP.cargoFacturacion]: "cargoFacturacion",
   [DEAL_PROPERTY_MAP.correoCasillaDTE]: "correoCasillaDTE",
+  [DEAL_PROPERTY_MAP.nombreRepresentanteLegal]: "nombreRepresentanteLegal",
+  [DEAL_PROPERTY_MAP.rutRepresentanteLegal]: "rutRepresentanteLegal",
+  [DEAL_PROPERTY_MAP.correoRepresentanteLegal]: "correoRepresentanteLegal",
   [DEAL_PROPERTY_MAP.personeriaArchivo]: "personeriaFile",
   [DEAL_PROPERTY_MAP.requerimientoFacturacion]: "requerimientoFacturacion",
   [DEAL_PROPERTY_MAP.frecuenciaSolicitudOC]: "frecuenciaSolicitudOC",
@@ -138,6 +153,18 @@ function mapContactErrorToFieldErrors(
   sectionKey: ContactSectionKey,
   contactIndex: number,
 ) {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  if (
+    sectionKey === "cobranzaContacts" &&
+    message.includes(CONTACT_PROPERTY_MAP.observaciones)
+  ) {
+    return {
+      observacionesCobranza: FIELD_REVIEW_ERROR,
+    };
+  }
+
   const mappedErrors = mapErrorToFieldErrors(error, payload);
   const contextPrefix = `${sectionKey}.${contactIndex}.`;
   const contextualErrors = Object.fromEntries(
@@ -164,6 +191,132 @@ function errorResponse(fieldErrors: Record<string, string>) {
   );
 }
 
+type ContactSection = {
+  key: ContactSectionKey;
+  contacts: ClientFormState[ContactSectionKey];
+};
+
+type ContactUpsertItem = {
+  contact: ContactDraft;
+  sectionKey: ContactSectionKey;
+  contactIndex: number;
+};
+
+function contactDedupeKey(contact: ContactDraft, fallback: string) {
+  if (contact.selectedContactId.trim()) {
+    return `id:${contact.selectedContactId.trim()}`;
+  }
+
+  if (contact.email.trim()) {
+    return `email:${contact.email.trim().toLowerCase()}`;
+  }
+
+  return fallback;
+}
+
+function mergeTextValue(currentValue: string, nextValue: string) {
+  return currentValue.trim() ? currentValue : nextValue;
+}
+
+function mergeContactDraft(
+  currentContact: ContactDraft,
+  nextContact: ContactDraft,
+) {
+  return {
+    ...currentContact,
+    selectedContactId: mergeTextValue(
+      currentContact.selectedContactId,
+      nextContact.selectedContactId,
+    ),
+    firstname: mergeTextValue(currentContact.firstname, nextContact.firstname),
+    lastname: mergeTextValue(currentContact.lastname, nextContact.lastname),
+    email: mergeTextValue(currentContact.email, nextContact.email),
+    phone: mergeTextValue(currentContact.phone, nextContact.phone),
+    cargo: mergeTextValue(currentContact.cargo, nextContact.cargo),
+    observaciones: mergeTextValue(
+      currentContact.observaciones,
+      nextContact.observaciones,
+    ),
+    rutRepresentanteLegal: mergeTextValue(
+      currentContact.rutRepresentanteLegal,
+      nextContact.rutRepresentanteLegal,
+    ),
+    tipoDeContacto: Array.from(
+      new Set([
+        ...currentContact.tipoDeContacto,
+        ...nextContact.tipoDeContacto,
+      ].filter(Boolean)),
+    ),
+  };
+}
+
+function getUniqueContactsToUpsert(sections: ContactSection[]) {
+  const contactsByKey = new Map<string, ContactUpsertItem>();
+
+  for (const section of sections) {
+    for (const [index, contact] of section.contacts.entries()) {
+      if (!contact.selectedContactId.trim() && !contact.email.trim()) {
+        continue;
+      }
+
+      const key = contactDedupeKey(
+        contact,
+        `${section.key}:${contact.localId || index}`,
+      );
+      const existing = contactsByKey.get(key);
+
+      if (!existing) {
+        contactsByKey.set(key, {
+          contact,
+          sectionKey: section.key,
+          contactIndex: index,
+        });
+        continue;
+      }
+
+      contactsByKey.set(key, {
+        ...existing,
+        contact: mergeContactDraft(existing.contact, contact),
+      });
+    }
+  }
+
+  return Array.from(contactsByKey.values());
+}
+
+function withCobranzaObservacionesOnPrimaryContact(form: ClientFormState) {
+  const primaryContact = getFirstContactForDealSummary(form.cobranzaContacts);
+
+  if (!primaryContact) {
+    return form;
+  }
+
+  return {
+    ...form,
+    cobranzaContacts: form.cobranzaContacts.map((contact) =>
+      contact.localId === primaryContact.localId
+        ? {
+            ...contact,
+            observaciones: form.observacionesCobranza,
+          }
+        : contact,
+    ),
+  };
+}
+
+function contactLogSummary(contact?: ContactDraft) {
+  if (!contact) {
+    return null;
+  }
+
+  return {
+    contactId: contact.selectedContactId || null,
+    email: contact.email || null,
+    name: getFullName(contact) || null,
+    roles: contact.tipoDeContacto,
+  };
+}
+
 export async function POST(request: Request) {
   let payload: ClientFormState | null = null;
 
@@ -183,7 +336,9 @@ export async function POST(request: Request) {
     }
 
     payload = withPrimaryContactDealFields(
-      JSON.parse(payloadRaw) as ClientFormState,
+      withCobranzaObservacionesOnPrimaryContact(
+        JSON.parse(payloadRaw) as ClientFormState,
+      ),
     );
 
     if (!payload.dealId) {
@@ -194,6 +349,69 @@ export async function POST(request: Request) {
         },
         { status: 400 },
       );
+    }
+
+    const contactSections: ContactSection[] = [
+      {
+        key: "cobranzaContacts",
+        contacts: payload.cobranzaContacts,
+      },
+      {
+        key: "facturacionContacts",
+        contacts: payload.facturacionContacts,
+      },
+      {
+        key: "legalContacts",
+        contacts: payload.legalContacts,
+      },
+    ];
+
+    console.log("[submit-client-form] contactos recibidos por sección", {
+      cobranza: payload.cobranzaContacts.length,
+      facturacion: payload.facturacionContacts.length,
+      representanteLegal: payload.legalContacts.length,
+    });
+    console.log("[submit-client-form] contactos usados para resumen del deal", {
+      cobranza: contactLogSummary(
+        getFirstContactForDealSummary(payload.cobranzaContacts),
+      ),
+      facturacion: contactLogSummary(
+        getFirstContactForDealSummary(payload.facturacionContacts),
+      ),
+      representanteLegal: contactLogSummary(
+        getFirstContactForDealSummary(payload.legalContacts),
+      ),
+    });
+
+    const uniqueContacts = getUniqueContactsToUpsert(contactSections);
+    console.log("[submit-client-form] contactos únicos a guardar/asociar", {
+      total: uniqueContacts.length,
+      contacts: uniqueContacts.map((item) => ({
+        section: item.sectionKey,
+        index: item.contactIndex,
+        ...contactLogSummary(item.contact),
+      })),
+    });
+
+    for (const item of uniqueContacts) {
+      try {
+        await upsertContactForDeal({
+          contact: item.contact,
+          dealId: payload.dealId,
+          mergeRoles: true,
+        });
+      } catch (error) {
+        console.error(error);
+
+        return errorResponse(
+          mapContactErrorToFieldErrors(
+            error,
+            payload,
+            item.sectionKey,
+            item.contactIndex,
+          ),
+        );
+      }
     }
 
     const dealProperties: Record<string, string> = {
@@ -214,6 +432,8 @@ export async function POST(request: Request) {
       });
     }
 
+    console.log("[submit-client-form] payload final del deal", dealProperties);
+
     try {
       await updateDeal(payload.dealId, dealProperties);
     } catch (error) {
@@ -226,37 +446,6 @@ export async function POST(request: Request) {
           ? fieldErrors
           : { formSave: FORM_SAVE_ERROR },
       );
-    }
-
-    const contactSections: Array<{
-      key: ContactSectionKey;
-      contacts: ClientFormState[ContactSectionKey];
-    }> = [
-      { key: "cobranzaContacts", contacts: payload.cobranzaContacts },
-      { key: "facturacionContacts", contacts: payload.facturacionContacts },
-      { key: "legalContacts", contacts: payload.legalContacts },
-    ];
-
-    for (const section of contactSections) {
-      for (const [index, contact] of section.contacts.entries()) {
-        if (!contact.selectedContactId && !contact.email.trim()) {
-          continue;
-        }
-
-        try {
-          await upsertContactForDeal({
-            contact,
-            dealId: payload.dealId,
-            mergeRoles: true,
-          });
-        } catch (error) {
-          console.error(error);
-
-          return errorResponse(
-            mapContactErrorToFieldErrors(error, payload, section.key, index),
-          );
-        }
-      }
     }
 
     return NextResponse.json({

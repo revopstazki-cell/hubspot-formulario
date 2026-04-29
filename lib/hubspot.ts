@@ -202,6 +202,9 @@ export async function searchContacts(query: string) {
     email: String(contact.properties[CONTACT_PROPERTY_MAP.email] ?? ""),
     phone: String(contact.properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
     cargo: String(contact.properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
+    observaciones: String(
+      contact.properties[CONTACT_PROPERTY_MAP.observaciones] ?? "",
+    ),
     rutRepresentanteLegal: String(
       contact.properties[CONTACT_PROPERTY_MAP.rutRepresentanteLegal] ?? "",
     ),
@@ -324,6 +327,9 @@ function getContactPropertiesPayload(
     [CONTACT_PROPERTY_MAP.email]: normalizedContact.email,
     [CONTACT_PROPERTY_MAP.phone]: normalizedContact.phone,
     [CONTACT_PROPERTY_MAP.cargo]: normalizedContact.cargo,
+    ...(normalizedContact.observaciones
+      ? { [CONTACT_PROPERTY_MAP.observaciones]: normalizedContact.observaciones }
+      : {}),
     [CONTACT_PROPERTY_MAP.rutRepresentanteLegal]:
       normalizedContact.rutRepresentanteLegal,
     [CONTACT_PROPERTY_MAP.idDeNegocio]: dealId,
