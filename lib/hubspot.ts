@@ -269,28 +269,46 @@ async function getContactsBatchByIds(contactIds: string[]) {
 }
 
 async function getContactByEmail(email: string) {
-  try {
-    const query = new URLSearchParams({
-      idProperty: "email",
-      properties: CONTACT_PROPERTIES.join(","),
-    });
+  const normalizedEmail = email.trim().toLowerCase();
 
-    const contact = await hubspotFetch<{
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const response = await hubspotFetch<{
+    results: Array<{
       id: string;
       properties: Record<string, string | null | undefined>;
-    }>(`/crm/v3/objects/contacts/${encodeURIComponent(email)}?${query.toString()}`);
+    }>;
+  }>("/crm/v3/objects/contacts/search", {
+    method: "POST",
+    body: JSON.stringify({
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: CONTACT_PROPERTY_MAP.email,
+              operator: "EQ",
+              value: normalizedEmail,
+            },
+          ],
+        },
+      ],
+      limit: 1,
+      properties: CONTACT_PROPERTIES,
+    }),
+  });
 
-    return {
-      id: contact.id,
-      properties: contact.properties,
-    } satisfies HubSpotContactRecord;
-  } catch (error) {
-    if (error instanceof Error && error.message.toLowerCase().includes("resource not found")) {
-      return null;
-    }
+  const contact = response.results[0];
 
-    throw error;
+  if (!contact) {
+    return null;
   }
+
+  return {
+    id: contact.id,
+    properties: contact.properties,
+  } satisfies HubSpotContactRecord;
 }
 
 function getContactPropertiesPayload(
