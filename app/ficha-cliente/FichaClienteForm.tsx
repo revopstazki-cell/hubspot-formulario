@@ -597,10 +597,10 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-7">
-      <div className="overflow-hidden rounded-[32px] border border-violet-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(32,45,76,0.10)] sm:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex w-fit shrink-0 rounded-3xl border border-violet-200 bg-white px-4 py-3 shadow-[0_16px_36px_rgba(53,0,168,0.10)]">
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#3500A8] to-[#5C62DE] p-6 text-white shadow-[0_24px_80px_rgba(53,0,168,0.24)] sm:p-8">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-3xl">
+            <div className="mb-6 flex w-fit rounded-2xl border border-white/25 bg-white/95 px-4 py-3 shadow-[0_16px_36px_rgba(32,45,76,0.12)]">
               <Image
                 src="/tazki-logo.jpg"
                 alt="Tazki"
@@ -610,19 +610,16 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
                 className="h-14 w-40 object-contain sm:w-48"
               />
             </div>
-            <div>
-              <h1 className="text-3xl font-black tracking-[-0.04em] text-neutral-900 sm:text-4xl">
-                Ficha de cliente
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-neutral-700">
-                Completa y actualiza la información clave del cliente para
-                mantener HubSpot ordenado y listo para la operación.
-              </p>
-            </div>
+            <h1 className="text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
+              Ficha de cliente
+            </h1>
+            <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-white/85 sm:text-lg">
+              Completa la información para iniciar el servicio correctamente
+            </p>
           </div>
-          <div className="rounded-3xl border border-violet-200 bg-violet-050 px-5 py-4 text-sm text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-            <div className="font-extrabold text-neutral-900">ID del negocio</div>
-            <div className="mt-1 font-mono text-xs font-semibold text-violet-900 sm:text-sm">
+          <div className="rounded-2xl border border-white/25 bg-white/15 px-5 py-4 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md lg:min-w-64">
+            <div className="font-extrabold text-white/80">ID del negocio</div>
+            <div className="mt-1 font-mono text-xs font-semibold text-white sm:text-sm">
               {form.dealId || "No enviado"}
             </div>
           </div>
@@ -912,7 +909,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           disabled={saving}
           className="min-h-12 rounded-2xl bg-violet-900 px-7 text-sm font-extrabold text-white shadow-[0_16px_36px_rgba(53,0,168,0.22)] transition hover:bg-violet-800 focus:outline-none focus:ring-4 focus:ring-violet-200 disabled:cursor-not-allowed disabled:bg-neutral-400 disabled:shadow-none"
         >
-          {saving ? "Guardando ficha..." : "Enviar ficha cliente"}
+          {saving ? "Guardando ficha..." : "Enviar ficha"}
         </button>
       </div>
     </form>
