@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  buildLegalRepresentativeContactDraft,
-  getDealUpdatePayload,
+  normalizeDealPayload,
   withPrimaryContactDealFields,
   type ClientFormState,
 } from "@/lib/clientForm";
@@ -13,9 +12,7 @@ import {
   upsertContactForDeal,
 } from "@/lib/hubspot";
 import {
-  COBRANZA_ROLE,
   DEAL_PROPERTY_MAP,
-  FACTURACION_ROLE,
 } from "@/lib/hubspotProperties";
 
 export const runtime = "nodejs";
@@ -51,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     const dealProperties: Record<string, string> = {
-      ...getDealUpdatePayload(payload),
+      ...normalizeDealPayload(payload),
     };
 
     if (personeriaFile instanceof File && personeriaFile.size > 0) {
@@ -62,36 +59,20 @@ export async function POST(request: Request) {
 
     await updateDeal(payload.dealId, dealProperties);
 
-    const representative = buildLegalRepresentativeContactDraft(payload);
-    await upsertContactForDeal({
-      contact: representative,
-      dealId: payload.dealId,
-      roles: representative.tipoDeContacto,
-      mergeRoles: true,
-    });
+    const allContacts = [
+      ...payload.cobranzaContacts,
+      ...payload.facturacionContacts,
+      ...payload.legalContacts,
+    ];
 
-    for (const contact of payload.cobranzaContacts) {
-      if (!contact.firstname.trim() && !contact.selectedContactId && !contact.email.trim()) {
+    for (const contact of allContacts) {
+      if (!contact.selectedContactId && !contact.email.trim()) {
         continue;
       }
 
       await upsertContactForDeal({
         contact,
         dealId: payload.dealId,
-        roles: [COBRANZA_ROLE],
-        mergeRoles: true,
-      });
-    }
-
-    for (const contact of payload.facturacionContacts) {
-      if (!contact.firstname.trim() && !contact.selectedContactId && !contact.email.trim()) {
-        continue;
-      }
-
-      await upsertContactForDeal({
-        contact,
-        dealId: payload.dealId,
-        roles: [FACTURACION_ROLE],
         mergeRoles: true,
       });
     }

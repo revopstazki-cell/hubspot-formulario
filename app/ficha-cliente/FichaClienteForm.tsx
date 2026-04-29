@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
 import { ContactSection } from "@/components/ficha-cliente/ContactSection";
@@ -18,19 +18,57 @@ import {
   COBRANZA_ROLE,
   DEFAULT_FORM_REQUIRED_FIELDS,
   FACTURACION_ROLE,
-  FREQUENCY_OPTIONS,
-  PLATFORM_OPTIONS,
-  REQUIREMENT_OPTIONS,
-  YES_NO_OPTIONS,
+  LEGAL_REPRESENTATIVE_ROLE,
+  type PropertyOption,
 } from "@/lib/hubspotProperties";
 
 type FichaClienteFormProps = {
   initialData: ClientFormState;
 };
 
-type ContactListKey = "cobranzaContacts" | "facturacionContacts";
+type ContactListKey =
+  | "cobranzaContacts"
+  | "facturacionContacts"
+  | "legalContacts";
+
+type OptionKey =
+  | "comuna"
+  | "cargo"
+  | "tipoDeContacto"
+  | "existePlataforma"
+  | "nombrePlataforma"
+  | "requerimientoFacturacion"
+  | "frecuenciaOC"
+  | "frecuenciaMIGO"
+  | "frecuenciaHES"
+  | "frecuenciaEDP";
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+const PROPERTY_REQUESTS: Record<
+  OptionKey,
+  { object: "contacts" | "deals"; property: string }
+> = {
+  comuna: { object: "deals", property: "comuna" },
+  cargo: { object: "contacts", property: "cargo" },
+  tipoDeContacto: { object: "contacts", property: "tipo_de_contacto" },
+  existePlataforma: {
+    object: "deals",
+    property: "existe_plataforma_de_creacion_de_proveedores",
+  },
+  nombrePlataforma: {
+    object: "deals",
+    property: "nombre_plataforma_creacion_de_proveedores",
+  },
+  requerimientoFacturacion: {
+    object: "deals",
+    property: "requerimiento_facturacion",
+  },
+  frecuenciaOC: { object: "deals", property: "frecuencia_solicitud_oc" },
+  frecuenciaMIGO: { object: "deals", property: "frecuencia_solicitud_migo" },
+  frecuenciaHES: { object: "deals", property: "frecuencia_solicitud_hes" },
+  frecuenciaEDP: { object: "deals", property: "frecuencia_solicitud_edp" },
+};
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -41,17 +79,109 @@ function isValidInternationalPhone(value: string) {
   return /^\+[1-9]\d{6,14}$/.test(compactValue);
 }
 
-function createContact(role: string) {
-  return createEmptyContactDraft([role]);
+function normalizeLabel(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function optionList(options: PropertyOption[], placeholder: string) {
+  return [{ label: placeholder, value: "" }, ...options];
+}
+
+function selectedOptionMatches(
+  value: string,
+  options: PropertyOption[],
+  labels: string[],
+) {
+  const selectedOption = options.find((option) => option.value === value);
+  const normalizedLabels = labels.map(normalizeLabel);
+  const candidates = [value, selectedOption?.label ?? ""].map(normalizeLabel);
+
+  return candidates.some((candidate) => normalizedLabels.includes(candidate));
+}
+
+function selectedValuesInclude(
+  values: string[],
+  options: PropertyOption[],
+  labels: string[],
+) {
+  return values.some((value) => selectedOptionMatches(value, options, labels));
+}
+
+function findOptionValue(options: PropertyOption[], labels: string[]) {
+  const normalizedLabels = labels.map(normalizeLabel);
+  const match = options.find((option) =>
+    [option.label, option.value]
+      .map(normalizeLabel)
+      .some((value) => normalizedLabels.includes(value)),
+  );
+
+  return match?.value ?? labels[0] ?? "";
+}
+
+function contactHasData(contact: ContactDraft) {
+  return Boolean(
+    contact.selectedContactId ||
+      contact.firstname.trim() ||
+      contact.lastname.trim() ||
+      contact.email.trim() ||
+      contact.phone.trim() ||
+      contact.cargo.trim() ||
+      contact.tipoDeContacto.length > 0,
+  );
 }
 
 export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
   const [form, setForm] = useState<ClientFormState>(initialData);
+  const [propertyOptions, setPropertyOptions] = useState<
+    Partial<Record<OptionKey, PropertyOption[]>>
+  >({});
   const [personeriaFile, setPersoneriaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadOptions() {
+      const entries = await Promise.all(
+        Object.entries(PROPERTY_REQUESTS).map(async ([key, request]) => {
+          try {
+            const params = new URLSearchParams({
+              object: request.object,
+              property: request.property,
+            });
+            const response = await fetch(
+              `/api/hubspot/property-options?${params.toString()}`,
+            );
+            const data = (await response.json()) as {
+              success: boolean;
+              options?: PropertyOption[];
+            };
+
+            return [key, data.options ?? []] as const;
+          } catch {
+            return [key, []] as const;
+          }
+        }),
+      );
+
+      if (isMounted) {
+        setPropertyOptions(Object.fromEntries(entries));
+      }
+    }
+
+    loadOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const generatedLink = useMemo(() => {
     if (typeof window === "undefined") {
@@ -60,6 +190,45 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
     return `${window.location.origin}/ficha-cliente?id=${form.dealId}`;
   }, [form.dealId]);
+
+  const typeOptions = propertyOptions.tipoDeContacto ?? [];
+  const cargoOptions = propertyOptions.cargo ?? [];
+  const cobranzaTypeValue = findOptionValue(typeOptions, [COBRANZA_ROLE]);
+  const facturacionTypeValue = findOptionValue(typeOptions, [
+    FACTURACION_ROLE,
+    "Facturacion",
+  ]);
+  const legalTypeValue = findOptionValue(typeOptions, [LEGAL_REPRESENTATIVE_ROLE]);
+  const showSupplierPlatform = selectedOptionMatches(
+    form.existePlataformaProveedores,
+    propertyOptions.existePlataforma ?? [],
+    ["Si", "Sí", "Yes"],
+  );
+  const showSupplierOther = selectedOptionMatches(
+    form.nombrePlataformaProveedores,
+    propertyOptions.nombrePlataforma ?? [],
+    ["Otra", "Otro", "Other"],
+  );
+  const hasRequirementOC = selectedValuesInclude(
+    form.requerimientoFacturacion,
+    propertyOptions.requerimientoFacturacion ?? [],
+    ["OC"],
+  );
+  const hasRequirementMIGO = selectedValuesInclude(
+    form.requerimientoFacturacion,
+    propertyOptions.requerimientoFacturacion ?? [],
+    ["MIGO"],
+  );
+  const hasRequirementHES = selectedValuesInclude(
+    form.requerimientoFacturacion,
+    propertyOptions.requerimientoFacturacion ?? [],
+    ["HES"],
+  );
+  const hasRequirementEDP = selectedValuesInclude(
+    form.requerimientoFacturacion,
+    propertyOptions.requerimientoFacturacion ?? [],
+    ["EDP"],
+  );
 
   function updateField<K extends keyof ClientFormState>(
     key: K,
@@ -78,31 +247,30 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     }));
   }
 
+  function createContact(defaultTypeValue: string) {
+    return createEmptyContactDraft(defaultTypeValue ? [defaultTypeValue] : []);
+  }
+
   function validateContactList(
     key: ContactListKey,
     contacts: ContactDraft[],
     errors: Record<string, string>,
   ) {
     for (const [index, contact] of contacts.entries()) {
-      if (!contact.firstname.trim()) {
-        errors[`${key}.${index}.firstname`] = "El nombre es obligatorio.";
+      if (!contactHasData(contact)) {
+        continue;
       }
 
-      if (!contact.email.trim()) {
-        errors[`${key}.${index}.email`] = "El correo es obligatorio.";
-      } else if (!isValidEmail(contact.email.trim())) {
+      if (!contact.selectedContactId && !contact.email.trim()) {
+        errors[`${key}.${index}.email`] =
+          "Agrega correo o selecciona un contacto existente.";
+      } else if (contact.email.trim() && !isValidEmail(contact.email.trim())) {
         errors[`${key}.${index}.email`] = "Ingresa un correo valido.";
       }
 
-      if (!contact.phone.trim()) {
-        errors[`${key}.${index}.phone`] = "El telefono es obligatorio.";
-      } else if (!isValidInternationalPhone(contact.phone.trim())) {
+      if (contact.phone.trim() && !isValidInternationalPhone(contact.phone.trim())) {
         errors[`${key}.${index}.phone`] =
           "Usa formato internacional, por ejemplo +56912345678.";
-      }
-
-      if (!contact.cargo.trim()) {
-        errors[`${key}.${index}.cargo`] = "Selecciona un cargo.";
       }
     }
   }
@@ -121,33 +289,19 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
       }
     }
 
-    const directEmailFields = [
-      "correoCasillaDTE",
-      "correoRepresentanteLegal",
-    ] as const;
-
-    for (const key of directEmailFields) {
-      const value = normalizedForm[key].trim();
-
-      if (value && !isValidEmail(value)) {
-        errors[key] = "Ingresa un correo valido.";
-      }
+    if (
+      normalizedForm.correoCasillaDTE.trim() &&
+      !isValidEmail(normalizedForm.correoCasillaDTE.trim())
+    ) {
+      errors.correoCasillaDTE = "Ingresa un correo valido.";
     }
 
     validateContactList("cobranzaContacts", form.cobranzaContacts, errors);
-    validateContactList(
-      "facturacionContacts",
-      form.facturacionContacts,
-      errors,
-    );
+    validateContactList("facturacionContacts", form.facturacionContacts, errors);
+    validateContactList("legalContacts", form.legalContacts, errors);
 
     if (personeriaFile && personeriaFile.size > MAX_FILE_SIZE_BYTES) {
       errors.personeriaFile = "El archivo no puede superar 10 MB.";
-    }
-
-    if (!personeriaFile && !normalizedForm.personeriaArchivo) {
-      errors.personeriaFile =
-        "Debes adjuntar la personeria o mantener una ya cargada.";
     }
 
     return errors;
@@ -162,17 +316,31 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     setSuccessMessage("");
 
     if (Object.keys(errors).length > 0) {
-      setErrorMessage("Revisa los campos obligatorios antes de enviar.");
+      setErrorMessage("Revisa los campos antes de enviar.");
       return;
     }
 
     setSaving(true);
 
     try {
-      const normalizedForm = withPrimaryContactDealFields({
+      const conditionalForm: ClientFormState = {
         ...form,
         linkFichaCliente: generatedLink,
-      });
+        nombrePlataformaProveedores: showSupplierPlatform
+          ? form.nombrePlataformaProveedores
+          : "",
+        comentarioPlataformaProveedores:
+          showSupplierPlatform && showSupplierOther
+            ? form.comentarioPlataformaProveedores
+            : "",
+        frecuenciaSolicitudOC: hasRequirementOC ? form.frecuenciaSolicitudOC : "",
+        frecuenciaSolicitudMIGO: hasRequirementMIGO
+          ? form.frecuenciaSolicitudMIGO
+          : "",
+        frecuenciaSolicitudHES: hasRequirementHES ? form.frecuenciaSolicitudHES : "",
+        frecuenciaSolicitudEDP: hasRequirementEDP ? form.frecuenciaSolicitudEDP : "",
+      };
+      const normalizedForm = withPrimaryContactDealFields(conditionalForm);
       const body = new FormData();
       body.append("payload", JSON.stringify(normalizedForm));
 
@@ -180,7 +348,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         body.append("personeriaFile", personeriaFile);
       }
 
-      const response = await fetch("/api/submit-client-form", {
+      const response = await fetch("/api/submit", {
         method: "POST",
         body,
       });
@@ -296,11 +464,12 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           required
           error={fieldErrors.direccionFacturacion}
         />
-        <TextInput
+        <SelectInput
           label="Comuna"
           name="comuna"
           value={form.comuna}
           onChange={(value) => updateField("comuna", value)}
+          options={optionList(propertyOptions.comuna ?? [], "Selecciona comuna")}
           required
           error={fieldErrors.comuna}
         />
@@ -315,17 +484,19 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
       </FormSection>
 
       <ContactSection
-        title="Datos de Cobranza / Proveedores"
-        description="Agrega uno o mas contactos para cobranza y proveedores."
-        addLabel="+ Agregar contacto"
+        title="Contactos de Cobranza / Proveedores"
+        addLabel="+ Agregar contacto de cobranza"
         fieldPrefix="cobranzaContacts"
         contacts={form.cobranzaContacts}
+        cargoOptions={cargoOptions}
+        typeOptions={typeOptions}
+        defaultTypeValue={cobranzaTypeValue}
         errors={fieldErrors}
-        createContact={() => createContact(COBRANZA_ROLE)}
+        createContact={() => createContact(cobranzaTypeValue)}
         onChange={(contacts) => updateContactList("cobranzaContacts", contacts)}
       />
 
-      <FormSection title="Datos - Plataforma proveedores">
+      <FormSection title="Area cobranza / proveedores">
         <TextInput
           label="Observaciones cobranza"
           name="observacionesCobranza"
@@ -338,36 +509,49 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           name="existePlataformaProveedores"
           value={form.existePlataformaProveedores}
           onChange={(value) => updateField("existePlataformaProveedores", value)}
-          options={[{ label: "Selecciona una opcion", value: "" }, ...YES_NO_OPTIONS]}
+          options={optionList(
+            propertyOptions.existePlataforma ?? [],
+            "Selecciona una opcion",
+          )}
           required
           error={fieldErrors.existePlataformaProveedores}
         />
-        <SelectInput
-          label="Nombre plataforma creacion de proveedores"
-          name="nombrePlataformaProveedores"
-          value={form.nombrePlataformaProveedores}
-          onChange={(value) => updateField("nombrePlataformaProveedores", value)}
-          options={PLATFORM_OPTIONS}
-        />
-        <TextInput
-          label="Comentario plataforma creacion de proveedores"
-          name="comentarioPlataformaProveedores"
-          value={form.comentarioPlataformaProveedores}
-          onChange={(value) =>
-            updateField("comentarioPlataformaProveedores", value)
-          }
-          multiline
-        />
+        {showSupplierPlatform ? (
+          <SelectInput
+            label="Nombre plataforma creacion de proveedores"
+            name="nombrePlataformaProveedores"
+            value={form.nombrePlataformaProveedores}
+            onChange={(value) =>
+              updateField("nombrePlataformaProveedores", value)
+            }
+            options={optionList(
+              propertyOptions.nombrePlataforma ?? [],
+              "Selecciona plataforma",
+            )}
+          />
+        ) : null}
+        {showSupplierPlatform && showSupplierOther ? (
+          <TextInput
+            label="Otra:"
+            name="comentarioPlataformaProveedores"
+            value={form.comentarioPlataformaProveedores}
+            onChange={(value) =>
+              updateField("comentarioPlataformaProveedores", value)
+            }
+          />
+        ) : null}
       </FormSection>
 
       <ContactSection
-        title="Datos de Facturación"
-        description="Agrega uno o mas contactos para recepcion y gestion de facturas."
-        addLabel="+ Agregar contacto"
+        title="Contactos de Facturación"
+        addLabel="+ Agregar contacto de facturación"
         fieldPrefix="facturacionContacts"
         contacts={form.facturacionContacts}
+        cargoOptions={cargoOptions}
+        typeOptions={typeOptions}
+        defaultTypeValue={facturacionTypeValue}
         errors={fieldErrors}
-        createContact={() => createContact(FACTURACION_ROLE)}
+        createContact={() => createContact(facturacionTypeValue)}
         onChange={(contacts) =>
           updateContactList("facturacionContacts", contacts)
         }
@@ -385,36 +569,34 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         />
       </FormSection>
 
-      <FormSection title="Datos - Representante legal">
-        <TextInput
-          label="Nombre representante legal"
-          name="nombreRepresentanteLegal"
-          value={form.nombreRepresentanteLegal}
-          onChange={(value) => updateField("nombreRepresentanteLegal", value)}
-          required
-          error={fieldErrors.nombreRepresentanteLegal}
-        />
+      <ContactSection
+        title="Contactos de Representante Legal"
+        addLabel="+ Agregar representante legal"
+        fieldPrefix="legalContacts"
+        contacts={form.legalContacts}
+        cargoOptions={cargoOptions}
+        typeOptions={typeOptions}
+        defaultTypeValue={legalTypeValue}
+        errors={fieldErrors}
+        createContact={() => createContact(legalTypeValue)}
+        onChange={(contacts) => updateContactList("legalContacts", contacts)}
+      />
+
+      <FormSection title="Datos legales del representante">
         <TextInput
           label="RUT representante legal"
           name="rutRepresentanteLegal"
           value={form.rutRepresentanteLegal}
           onChange={(value) => updateField("rutRepresentanteLegal", value)}
-          required
           error={fieldErrors.rutRepresentanteLegal}
         />
-        <TextInput
-          label="Correo representante legal"
-          name="correoRepresentanteLegal"
-          value={form.correoRepresentanteLegal}
-          onChange={(value) => updateField("correoRepresentanteLegal", value)}
-          type="email"
-          required
-          error={fieldErrors.correoRepresentanteLegal}
-        />
+      </FormSection>
+
+      <FormSection title="Archivo de personería">
         <FileUpload
-          label="Personeria archivo"
-          required
-          fileName={personeriaFile?.name || form.personeriaArchivo}
+          label="Personería"
+          fileName={personeriaFile?.name}
+          existingValue={form.personeriaArchivo}
           onChange={setPersoneriaFile}
           error={fieldErrors.personeriaFile}
           helperText="Subiremos el archivo desde backend a HubSpot y guardaremos su referencia en el deal."
@@ -424,38 +606,58 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
       <FormSection title="Datos - Administracion y finanzas">
         <CheckboxGroup
           label="Requerimientos facturacion"
-          options={REQUIREMENT_OPTIONS}
+          options={propertyOptions.requerimientoFacturacion ?? []}
           values={form.requerimientoFacturacion}
           onChange={(values) => updateField("requerimientoFacturacion", values)}
         />
-        <SelectInput
-          label="Frecuencia solicitud OC"
-          name="frecuenciaSolicitudOC"
-          value={form.frecuenciaSolicitudOC}
-          onChange={(value) => updateField("frecuenciaSolicitudOC", value)}
-          options={FREQUENCY_OPTIONS}
-        />
-        <SelectInput
-          label="Frecuencia solicitud MIGO"
-          name="frecuenciaSolicitudMIGO"
-          value={form.frecuenciaSolicitudMIGO}
-          onChange={(value) => updateField("frecuenciaSolicitudMIGO", value)}
-          options={FREQUENCY_OPTIONS}
-        />
-        <SelectInput
-          label="Frecuencia solicitud HES"
-          name="frecuenciaSolicitudHES"
-          value={form.frecuenciaSolicitudHES}
-          onChange={(value) => updateField("frecuenciaSolicitudHES", value)}
-          options={FREQUENCY_OPTIONS}
-        />
-        <SelectInput
-          label="Frecuencia solicitud EDP"
-          name="frecuenciaSolicitudEDP"
-          value={form.frecuenciaSolicitudEDP}
-          onChange={(value) => updateField("frecuenciaSolicitudEDP", value)}
-          options={FREQUENCY_OPTIONS}
-        />
+        {hasRequirementOC ? (
+          <SelectInput
+            label="Frecuencia solicitud OC"
+            name="frecuenciaSolicitudOC"
+            value={form.frecuenciaSolicitudOC}
+            onChange={(value) => updateField("frecuenciaSolicitudOC", value)}
+            options={optionList(
+              propertyOptions.frecuenciaOC ?? [],
+              "Selecciona frecuencia",
+            )}
+          />
+        ) : null}
+        {hasRequirementMIGO ? (
+          <SelectInput
+            label="Frecuencia solicitud MIGO"
+            name="frecuenciaSolicitudMIGO"
+            value={form.frecuenciaSolicitudMIGO}
+            onChange={(value) => updateField("frecuenciaSolicitudMIGO", value)}
+            options={optionList(
+              propertyOptions.frecuenciaMIGO ?? [],
+              "Selecciona frecuencia",
+            )}
+          />
+        ) : null}
+        {hasRequirementHES ? (
+          <SelectInput
+            label="Frecuencia solicitud HES"
+            name="frecuenciaSolicitudHES"
+            value={form.frecuenciaSolicitudHES}
+            onChange={(value) => updateField("frecuenciaSolicitudHES", value)}
+            options={optionList(
+              propertyOptions.frecuenciaHES ?? [],
+              "Selecciona frecuencia",
+            )}
+          />
+        ) : null}
+        {hasRequirementEDP ? (
+          <SelectInput
+            label="Frecuencia solicitud EDP"
+            name="frecuenciaSolicitudEDP"
+            value={form.frecuenciaSolicitudEDP}
+            onChange={(value) => updateField("frecuenciaSolicitudEDP", value)}
+            options={optionList(
+              propertyOptions.frecuenciaEDP ?? [],
+              "Selecciona frecuencia",
+            )}
+          />
+        ) : null}
       </FormSection>
 
       <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">

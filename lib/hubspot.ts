@@ -1,6 +1,7 @@
 import {
   cleanObject,
   joinHubSpotMultiValue,
+  normalizeContactPayload,
   splitHubSpotMultiValue,
   type ContactDraft,
   type ContactSearchResult,
@@ -11,6 +12,7 @@ import {
   CONTACT_PROPERTIES,
   CONTACT_PROPERTY_MAP,
   DEAL_PROPERTIES,
+  type PropertyOption,
 } from "@/lib/hubspotProperties";
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com";
@@ -24,6 +26,19 @@ type HubSpotFileUploadResult = {
   id: string;
   url?: string;
   defaultHostingUrl?: string;
+};
+
+type HubSpotPropertyResponse = {
+  label: string;
+  name: string;
+  type: string;
+  fieldType: string;
+  options?: Array<{
+    label: string;
+    value: string;
+    hidden?: boolean;
+    displayOrder?: number;
+  }>;
 };
 
 export function getHubSpotToken() {
@@ -127,6 +142,23 @@ export async function getContactById(contactId: string) {
   } satisfies HubSpotContactRecord;
 }
 
+export async function getPropertyOptions(
+  objectType: "contacts" | "deals",
+  propertyName: string,
+) {
+  const property = await hubspotFetch<HubSpotPropertyResponse>(
+    `/crm/v3/properties/${objectType}/${propertyName}`,
+  );
+
+  return (property.options ?? [])
+    .filter((option) => !option.hidden)
+    .sort((first, second) => (first.displayOrder ?? 0) - (second.displayOrder ?? 0))
+    .map<PropertyOption>((option) => ({
+      label: option.label,
+      value: option.value,
+    }));
+}
+
 export async function searchContacts(query: string) {
   const response = await hubspotFetch<{
     results: Array<{
@@ -150,6 +182,9 @@ export async function searchContacts(query: string) {
     phone: String(contact.properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
     cargo: String(contact.properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
     tipoDeContacto: splitHubSpotMultiValue(
+      String(contact.properties[CONTACT_PROPERTY_MAP.tipoDeContacto] ?? ""),
+    ),
+    tipo_de_contacto: splitHubSpotMultiValue(
       String(contact.properties[CONTACT_PROPERTY_MAP.tipoDeContacto] ?? ""),
     ),
   }));
@@ -239,12 +274,14 @@ function getContactPropertiesPayload(
   dealId: string,
   roles: string[],
 ) {
+  const normalizedContact = normalizeContactPayload(contact);
+
   return cleanObject({
-    [CONTACT_PROPERTY_MAP.firstname]: contact.firstname,
-    [CONTACT_PROPERTY_MAP.lastname]: contact.lastname,
-    [CONTACT_PROPERTY_MAP.email]: contact.email,
-    [CONTACT_PROPERTY_MAP.phone]: contact.phone,
-    [CONTACT_PROPERTY_MAP.cargo]: contact.cargo,
+    [CONTACT_PROPERTY_MAP.firstname]: normalizedContact.firstname,
+    [CONTACT_PROPERTY_MAP.lastname]: normalizedContact.lastname,
+    [CONTACT_PROPERTY_MAP.email]: normalizedContact.email,
+    [CONTACT_PROPERTY_MAP.phone]: normalizedContact.phone,
+    [CONTACT_PROPERTY_MAP.cargo]: normalizedContact.cargo,
     [CONTACT_PROPERTY_MAP.idDeNegocio]: dealId,
     [CONTACT_PROPERTY_MAP.tipoDeContacto]: joinHubSpotMultiValue(roles),
   });
@@ -304,11 +341,12 @@ async function resolveExistingContact(contact: ContactDraft) {
 export async function upsertContactForDeal(params: {
   contact: ContactDraft;
   dealId: string;
-  roles: string[];
   mergeRoles?: boolean;
 }) {
-  const { contact, dealId, roles, mergeRoles = false } = params;
+  const { contact, dealId, mergeRoles = false } = params;
+  const normalizedContact = normalizeContactPayload(contact);
   const existing = await resolveExistingContact(contact);
+  const roles = normalizedContact.tipoDeContacto;
 
   const mergedRoles =
     mergeRoles && existing
@@ -323,7 +361,11 @@ export async function upsertContactForDeal(params: {
       : roles;
 
   if (existing) {
-    const properties = getContactPropertiesPayload(contact, dealId, mergedRoles);
+    const properties = getContactPropertiesPayload(
+      normalizedContact,
+      dealId,
+      mergedRoles,
+    );
     await updateContact(existing.id, properties);
     await associateContactToDeal(existing.id, dealId);
 
@@ -334,14 +376,14 @@ export async function upsertContactForDeal(params: {
     };
   }
 
-  if (!contact.email) {
+  if (!normalizedContact.email) {
     throw new Error(
       "No se puede crear un contacto nuevo sin correo. Selecciona uno existente o agrega email.",
     );
   }
 
   const created = await createContact(
-    getContactPropertiesPayload(contact, dealId, mergedRoles),
+    getContactPropertiesPayload(normalizedContact, dealId, mergedRoles),
   );
   await associateContactToDeal(created.id, dealId);
 

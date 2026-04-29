@@ -4,6 +4,7 @@ type FileUploadProps = {
   error?: string;
   helperText?: string;
   fileName?: string;
+  existingValue?: string;
   onChange: (file: File | null) => void;
 };
 
@@ -13,6 +14,7 @@ export function FileUpload({
   error,
   helperText,
   fileName,
+  existingValue,
   onChange,
 }: FileUploadProps) {
   return (
@@ -29,6 +31,23 @@ export function FileUpload({
         />
         {fileName ? (
           <p className="mt-3 text-sm text-slate-600">Archivo seleccionado: {fileName}</p>
+        ) : null}
+        {existingValue ? (
+          <p className="mt-3 text-sm text-slate-600">
+            Archivo existente:{" "}
+            {existingValue.startsWith("http") ? (
+              <a
+                href={existingValue}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-[#7B3FF2] underline-offset-4 hover:underline"
+              >
+                Ver archivo
+              </a>
+            ) : (
+              <span className="font-mono text-xs">{existingValue}</span>
+            )}
+          </p>
         ) : null}
       </div>
       {error ? <span className="text-sm text-rose-600">{error}</span> : null}

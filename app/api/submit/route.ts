@@ -1,8 +1,3 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 
-export async function POST() {
-  return NextResponse.json({
-    success: true,
-    message: "Ruta submit lista",
-  });
-}
+export { POST } from "@/app/api/submit-client-form/route";

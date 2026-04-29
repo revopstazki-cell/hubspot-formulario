@@ -49,47 +49,10 @@ export const CONTACT_PROPERTY_MAP = {
 export const DEAL_PROPERTIES = Object.values(DEAL_PROPERTY_MAP);
 export const CONTACT_PROPERTIES = Object.values(CONTACT_PROPERTY_MAP);
 
-export const YES_NO_OPTIONS = [
-  { label: "Si", value: "Si" },
-  { label: "No", value: "No" },
-];
-
-export const PLATFORM_OPTIONS = [
-  { label: "Selecciona una opcion", value: "" },
-  { label: "Otra", value: "Otra" },
-  { label: "SAP Ariba", value: "SAP Ariba" },
-  { label: "AP Ariba", value: "AP Ariba" },
-  { label: "Oracle NetSuite", value: "Oracle NetSuite" },
-  { label: "Microsoft Dynamics 365", value: "Microsoft Dynamics 365" },
-  { label: "Defontana", value: "Defontana" },
-  { label: "Softland", value: "Softland" },
-  { label: "Transtecnia", value: "Transtecnia" },
-];
-
-export const FREQUENCY_OPTIONS = [
-  { label: "Selecciona una opcion", value: "" },
-  { label: "Mensual", value: "Mensual" },
-  { label: "Anual", value: "Anual" },
-  { label: "Trimestral", value: "Trimestral" },
-  { label: "Semestral", value: "Semestral" },
-  { label: "Multianual", value: "Multianual" },
-];
-
-export const REQUIREMENT_OPTIONS = [
-  { label: "OC", value: "OC" },
-  { label: "MIGO", value: "MIGO" },
-  { label: "HES", value: "HES" },
-  { label: "EDP", value: "EDP" },
-];
-
-export const CARGO_OPTIONS = [
-  { label: "Selecciona un cargo", value: "" },
-  { label: "Finanzas", value: "Finanzas" },
-  { label: "Administración", value: "Administración" },
-  { label: "Compras", value: "Compras" },
-  { label: "Facturación", value: "Facturación" },
-  { label: "Otro", value: "Otro" },
-];
+export type PropertyOption = {
+  label: string;
+  value: string;
+};
 
 export const COBRANZA_ROLE = "Cobranza/Proveedores";
 export const FACTURACION_ROLE = "Facturación";
@@ -106,7 +69,4 @@ export const DEFAULT_FORM_REQUIRED_FIELDS = [
   "ciudadEmpresa",
   "existePlataformaProveedores",
   "correoCasillaDTE",
-  "nombreRepresentanteLegal",
-  "rutRepresentanteLegal",
-  "correoRepresentanteLegal",
 ] as const;

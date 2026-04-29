@@ -1,27 +1,146 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
+import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
 import { SelectInput } from "@/components/ficha-cliente/SelectInput";
 import { TextInput } from "@/components/ficha-cliente/TextInput";
-import type { ContactDraft } from "@/lib/clientForm";
-import { CARGO_OPTIONS } from "@/lib/hubspotProperties";
+import {
+  mapHubSpotContactToDraft,
+  type ContactDraft,
+  type ContactSearchResult,
+} from "@/lib/clientForm";
+import type { PropertyOption } from "@/lib/hubspotProperties";
+
+type ContactFieldPrefix =
+  | "cobranzaContacts"
+  | "facturacionContacts"
+  | "legalContacts";
 
 type ContactSectionProps = {
   title: string;
-  description?: string;
   addLabel: string;
-  fieldPrefix: "cobranzaContacts" | "facturacionContacts";
+  fieldPrefix: ContactFieldPrefix;
   contacts: ContactDraft[];
+  cargoOptions: PropertyOption[];
+  typeOptions: PropertyOption[];
+  defaultTypeValue: string;
   errors: Record<string, string>;
   onChange: (contacts: ContactDraft[]) => void;
   createContact: () => ContactDraft;
 };
 
+type ContactSearchInputProps = {
+  onSelect: (contact: ContactSearchResult) => void;
+};
+
+function contactDisplayName(contact: ContactSearchResult) {
+  return [contact.firstname, contact.lastname].filter(Boolean).join(" ").trim();
+}
+
+function mergeTypeValues(values: string[], defaultValue: string) {
+  return Array.from(new Set([defaultValue, ...values].filter(Boolean)));
+}
+
+function ContactSearchInput({ onSelect }: ContactSearchInputProps) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ContactSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+
+    if (trimmedQuery.length < 2) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setLoading(true);
+
+      try {
+        const response = await fetch(
+          `/api/contacts/search?q=${encodeURIComponent(trimmedQuery)}`,
+          { signal: controller.signal },
+        );
+        const data = (await response.json()) as {
+          success: boolean;
+          results?: ContactSearchResult[];
+        };
+
+        setResults(data.results ?? []);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  }, [query]);
+
+  return (
+    <div className="relative md:col-span-2">
+      <TextInput
+        label="Buscar contacto en HubSpot"
+        name="contactSearch"
+        value={query}
+        onChange={(value) => {
+          setQuery(value);
+
+          if (value.trim().length < 2) {
+            setResults([]);
+          }
+        }}
+        placeholder="Nombre, apellido o correo"
+      />
+
+      {query.trim().length >= 2 ? (
+        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+          {loading ? (
+            <div className="px-4 py-3 text-sm text-slate-500">Buscando...</div>
+          ) : results.length > 0 ? (
+            results.map((contact) => (
+              <button
+                key={contact.id}
+                type="button"
+                onClick={() => {
+                  onSelect(contact);
+                  setQuery(contactDisplayName(contact) || contact.email);
+                  setResults([]);
+                }}
+                className="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm transition hover:bg-[#7B3FF2]/5 last:border-b-0"
+              >
+                <span className="block font-medium text-slate-900">
+                  {contactDisplayName(contact) || "Sin nombre"}
+                </span>
+                <span className="block text-slate-500">
+                  {contact.email || "Sin correo"}
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-sm text-slate-500">
+              No encontramos contactos.
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ContactSection({
   title,
-  description,
   addLabel,
   fieldPrefix,
   contacts,
+  cargoOptions,
+  typeOptions,
+  defaultTypeValue,
   errors,
   onChange,
   createContact,
@@ -38,22 +157,33 @@ export function ContactSection({
     );
   }
 
+  function updateContactFromSearch(localId: string, selected: ContactSearchResult) {
+    const mappedContact = mapHubSpotContactToDraft(selected);
+
+    onChange(
+      contacts.map((contact) =>
+        contact.localId === localId
+          ? {
+              ...mappedContact,
+              localId,
+              tipoDeContacto: mergeTypeValues(
+                mappedContact.tipoDeContacto,
+                defaultTypeValue,
+              ),
+            }
+          : contact,
+      ),
+    );
+  }
+
   function removeContact(localId: string) {
-    const nextContacts = contacts.filter((contact) => contact.localId !== localId);
-    onChange(nextContacts.length > 0 ? nextContacts : [createContact()]);
+    onChange(contacts.filter((contact) => contact.localId !== localId));
   }
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-          {description ? (
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              {description}
-            </p>
-          ) : null}
-        </div>
+        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
         <button
           type="button"
           onClick={() => onChange([...contacts, createContact()])}
@@ -63,6 +193,12 @@ export function ContactSection({
         </button>
       </div>
 
+      {contacts.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+          No hay contactos agregados.
+        </div>
+      ) : null}
+
       <div className="space-y-4">
         {contacts.map((contact, index) => (
           <div
@@ -70,21 +206,31 @@ export function ContactSection({
             className="rounded-lg border border-slate-200 bg-slate-50 p-4"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Contacto {index + 1}
-              </h3>
-              {contacts.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => removeContact(contact.localId)}
-                  className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
-                >
-                  Eliminar
-                </button>
-              ) : null}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Contacto {index + 1}
+                </h3>
+                {contact.selectedContactId ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    HubSpot ID: {contact.selectedContactId}
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeContact(contact.localId)}
+                className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
+              >
+                Eliminar
+              </button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
+              <ContactSearchInput
+                onSelect={(selected) =>
+                  updateContactFromSearch(contact.localId, selected)
+                }
+              />
               <TextInput
                 label="Nombre"
                 name={`${fieldPrefix}-${index}-firstname`}
@@ -92,7 +238,6 @@ export function ContactSection({
                 onChange={(value) =>
                   updateContact(contact.localId, "firstname", value)
                 }
-                required
                 error={errors[`${fieldPrefix}.${index}.firstname`]}
               />
               <TextInput
@@ -111,7 +256,6 @@ export function ContactSection({
                   updateContact(contact.localId, "email", value)
                 }
                 type="email"
-                required
                 error={errors[`${fieldPrefix}.${index}.email`]}
               />
               <TextInput
@@ -123,9 +267,8 @@ export function ContactSection({
                 }
                 type="tel"
                 placeholder="+56912345678"
-                required
                 error={errors[`${fieldPrefix}.${index}.phone`]}
-                helperText="Usa formato internacional, por ejemplo +56912345678."
+                helperText="Formato internacional, por ejemplo +56912345678."
               />
               <SelectInput
                 label="Cargo"
@@ -134,9 +277,17 @@ export function ContactSection({
                 onChange={(value) =>
                   updateContact(contact.localId, "cargo", value)
                 }
-                options={CARGO_OPTIONS}
-                required
+                options={[{ label: "Selecciona un cargo", value: "" }, ...cargoOptions]}
                 error={errors[`${fieldPrefix}.${index}.cargo`]}
+              />
+              <CheckboxGroup
+                label="Tipo de contacto"
+                options={typeOptions}
+                values={contact.tipoDeContacto}
+                onChange={(values) =>
+                  updateContact(contact.localId, "tipoDeContacto", values)
+                }
+                error={errors[`${fieldPrefix}.${index}.tipoDeContacto`]}
               />
             </div>
           </div>
