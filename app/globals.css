@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --violet-900: #3500a8;
+  --violet-800: #3f1ec9;
+  --violet-700: #5c62de;
+  --violet-600: #7277e1;
+  --violet-500: #9094f0;
+  --violet-400: #a4a8ff;
+  --violet-300: #c3c6ff;
+  --violet-200: #d9dbff;
+  --violet-100: #ebebff;
+  --violet-050: #fbfbff;
+  --violet-000: #f3f3ff;
+  --neutral-900: #212121;
+  --neutral-800: #202d4c;
+  --neutral-700: #404d6d;
+  --neutral-600: #808ba7;
+  --neutral-500: #a5b0cb;
+  --neutral-400: #c7cfe3;
+  --neutral-300: #e1e7f4;
+  --neutral-200: #e6ebf5;
+  --neutral-100: #ecf0f9;
+  --neutral-050: #f8faff;
+  --neutral-000: #ffffff;
+  --background: var(--violet-050);
+  --foreground: var(--neutral-900);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --color-violet-900: var(--violet-900);
+  --color-violet-800: var(--violet-800);
+  --color-violet-700: var(--violet-700);
+  --color-violet-600: var(--violet-600);
+  --color-violet-500: var(--violet-500);
+  --color-violet-400: var(--violet-400);
+  --color-violet-300: var(--violet-300);
+  --color-violet-200: var(--violet-200);
+  --color-violet-100: var(--violet-100);
+  --color-violet-050: var(--violet-050);
+  --color-violet-000: var(--violet-000);
+  --color-neutral-900: var(--neutral-900);
+  --color-neutral-800: var(--neutral-800);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-050: var(--neutral-050);
+  --color-neutral-000: var(--neutral-000);
+  --font-sans: "Nunito Sans", "Nunito", Inter, system-ui, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Nunito Sans", "Nunito", Inter, system-ui, sans-serif;
+  text-rendering: geometricPrecision;
 }

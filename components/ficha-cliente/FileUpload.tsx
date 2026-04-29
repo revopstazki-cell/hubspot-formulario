@@ -19,40 +19,48 @@ export function FileUpload({
 }: FileUploadProps) {
   return (
     <label className="flex flex-col gap-2 md:col-span-2">
-      <span className="text-sm font-medium text-slate-700">
+      <span className="text-sm font-bold text-neutral-800">
         {label}
         {required ? <span className="text-rose-500"> *</span> : null}
       </span>
-      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5">
+      <div className="rounded-3xl border border-dashed border-violet-300 bg-violet-050 p-5">
         <input
           type="file"
           onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[#7B3FF2] file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
+          className="block w-full text-sm font-medium text-neutral-700 file:mr-4 file:rounded-2xl file:border-0 file:bg-violet-900 file:px-4 file:py-2.5 file:text-sm file:font-bold file:text-white hover:file:bg-violet-800"
         />
         {fileName ? (
-          <p className="mt-3 text-sm text-slate-600">Archivo seleccionado: {fileName}</p>
+          <p className="mt-3 text-sm font-medium text-neutral-700">
+            Archivo seleccionado: {fileName}
+          </p>
         ) : null}
         {existingValue ? (
-          <p className="mt-3 text-sm text-slate-600">
+          <p className="mt-3 text-sm font-medium text-neutral-700">
             Archivo existente:{" "}
             {existingValue.startsWith("http") ? (
               <a
                 href={existingValue}
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium text-[#7B3FF2] underline-offset-4 hover:underline"
+                className="font-extrabold text-violet-900 underline-offset-4 hover:underline"
               >
                 Ver archivo
               </a>
             ) : (
-              <span className="font-mono text-xs">{existingValue}</span>
+              <span className="font-mono text-xs text-neutral-700">
+                {existingValue}
+              </span>
             )}
           </p>
         ) : null}
       </div>
-      {error ? <span className="text-sm text-rose-600">{error}</span> : null}
+      {error ? (
+        <span className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+          {error}
+        </span>
+      ) : null}
       {!error && helperText ? (
-        <span className="text-xs text-slate-500">{helperText}</span>
+        <span className="text-xs font-medium text-neutral-600">{helperText}</span>
       ) : null}
     </label>
   );

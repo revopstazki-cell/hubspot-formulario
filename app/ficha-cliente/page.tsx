@@ -35,10 +35,10 @@ export default async function FichaClientePage({
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#f8fafc,_#eef2ff_55%,_#e2e8f0)] px-4 py-10 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_var(--violet-100),_var(--violet-050)_38%,_var(--neutral-050)_100%)] px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
       <div className="mx-auto max-w-6xl">
         {!dealId ? (
-          <div className="mb-8 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+          <div className="mb-8 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-medium text-amber-800 shadow-[0_16px_48px_rgba(32,45,76,0.08)]">
             Falta el ID del negocio en la URL. Usa{" "}
             <code className="rounded bg-amber-100 px-2 py-1">?id=59418649660</code>{" "}
             o{" "}
@@ -50,7 +50,7 @@ export default async function FichaClientePage({
         ) : null}
 
         {loadError ? (
-          <div className="mb-8 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          <div className="mb-8 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700 shadow-[0_16px_48px_rgba(32,45,76,0.08)]">
             No pudimos precargar el deal desde HubSpot. Puedes seguir editando la
             ficha manualmente.
             <div className="mt-2 font-medium">{loadError}</div>

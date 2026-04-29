@@ -98,35 +98,41 @@ function ContactSearchInput({
   if (hasSelection) {
     return (
       <div className="md:col-span-2">
-        <div className="rounded-lg border border-[#7B3FF2]/20 bg-[#7B3FF2]/5 px-4 py-3 text-sm">
-          <div className="font-medium text-slate-950">
-            Contacto seleccionado desde HubSpot
-          </div>
-          <div className="mt-1 text-slate-700">{selectedLabel}</div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsChanging(true);
-                setQuery("");
-                setResults([]);
-              }}
-              className="rounded-lg bg-[#7B3FF2] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6B32D9]"
-            >
-              Cambiar contacto
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsChanging(false);
-                setQuery("");
-                setResults([]);
-                onClearSelection();
-              }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400"
-            >
-              Limpiar selección
-            </button>
+        <div className="rounded-2xl border border-violet-300 bg-violet-050 px-4 py-3 text-sm shadow-[0_12px_36px_rgba(63,30,201,0.06)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-extrabold text-neutral-900">
+                Contacto seleccionado desde HubSpot
+              </div>
+              <div className="mt-1 font-medium text-neutral-700">
+                {selectedLabel}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChanging(true);
+                  setQuery("");
+                  setResults([]);
+                }}
+                className="rounded-xl bg-violet-900 px-3 py-2 text-xs font-extrabold text-white shadow-[0_10px_24px_rgba(53,0,168,0.18)] transition hover:bg-violet-800"
+              >
+                Cambiar contacto
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChanging(false);
+                  setQuery("");
+                  setResults([]);
+                  onClearSelection();
+                }}
+                className="rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-extrabold text-violet-900 transition hover:bg-violet-000"
+              >
+                Limpiar selección
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -154,9 +160,11 @@ function ContactSearchInput({
       />
 
       {query.trim().length >= 2 ? (
-        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-violet-200 bg-white shadow-[0_18px_60px_rgba(32,45,76,0.14)]">
           {loading ? (
-            <div className="px-4 py-3 text-sm text-slate-500">Buscando...</div>
+            <div className="px-4 py-3 text-sm font-medium text-neutral-600">
+              Buscando...
+            </div>
           ) : results.length > 0 ? (
             results.map((contact) => (
               <button
@@ -168,18 +176,18 @@ function ContactSearchInput({
                   setQuery("");
                   setResults([]);
                 }}
-                className="block w-full border-b border-slate-100 px-4 py-3 text-left text-sm transition hover:bg-[#7B3FF2]/5 last:border-b-0"
+                className="block w-full border-b border-neutral-100 px-4 py-3 text-left text-sm transition hover:bg-violet-050 last:border-b-0"
               >
-                <span className="block font-medium text-slate-900">
+                <span className="block font-extrabold text-neutral-900">
                   {contactDisplayName(contact) || "Sin nombre"}
                 </span>
-                <span className="block text-slate-500">
+                <span className="block font-medium text-neutral-600">
                   {contact.email || "Sin correo"}
                 </span>
               </button>
             ))
           ) : (
-            <div className="px-4 py-3 text-sm text-slate-500">
+            <div className="px-4 py-3 text-sm font-medium text-neutral-600">
               No encontramos contactos.
             </div>
           )}
@@ -239,43 +247,48 @@ export function ContactSection({
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+    <section className="rounded-[28px] border border-violet-200 bg-white/95 p-6 shadow-[0_20px_70px_rgba(32,45,76,0.08)] sm:p-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-4">
+          <div className="mt-1 h-10 w-1.5 shrink-0 rounded-full bg-violet-700" />
+          <h2 className="text-xl font-extrabold tracking-[-0.02em] text-neutral-900">
+            {title}
+          </h2>
+        </div>
         <button
           type="button"
           onClick={() => onChange([...contacts, createContact()])}
-          className="min-h-10 rounded-lg bg-[#7B3FF2] px-4 text-sm font-semibold text-white transition hover:bg-[#6B32D9] focus:outline-none focus:ring-2 focus:ring-[#7B3FF2] focus:ring-offset-2"
+          className="min-h-10 rounded-2xl border border-violet-300 bg-violet-050 px-4 text-sm font-extrabold text-violet-900 transition hover:border-violet-400 hover:bg-violet-100 focus:outline-none focus:ring-4 focus:ring-violet-200"
         >
           {addLabel}
         </button>
       </div>
 
       {note ? (
-        <div className="mb-4 rounded-lg border border-[#7B3FF2]/15 bg-[#7B3FF2]/5 px-4 py-3 text-sm leading-6 text-slate-600">
+        <div className="mb-5 rounded-2xl border border-violet-200 bg-violet-050 px-4 py-3 text-sm font-medium leading-6 text-neutral-700">
           {note}
         </div>
       ) : null}
 
       {contacts.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+        <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-050 px-5 py-6 text-sm font-medium text-neutral-600">
           No hay contactos agregados.
         </div>
       ) : null}
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {contacts.map((contact, index) => (
           <div
             key={contact.localId}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+            className="rounded-3xl border border-neutral-200 bg-neutral-050/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:p-5"
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">
+                <h3 className="text-sm font-extrabold text-neutral-900">
                   Contacto {index + 1}
                 </h3>
                 {contact.selectedContactId ? (
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs font-medium text-neutral-600">
                     HubSpot ID: {contact.selectedContactId}
                   </p>
                 ) : null}
@@ -283,7 +296,7 @@ export function ContactSection({
               <button
                 type="button"
                 onClick={() => removeContact(contact.localId)}
-                className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-300 hover:bg-rose-50"
+                className="rounded-2xl border border-rose-100 bg-white px-3 py-2 text-sm font-bold text-rose-600 transition hover:border-rose-200 hover:bg-rose-50"
               >
                 Eliminar
               </button>

@@ -13,7 +13,7 @@ type TextInputProps = {
 };
 
 const baseClassName =
-  "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#7B3FF2] focus:ring-2 focus:ring-[#7B3FF2]/15";
+  "w-full rounded-2xl border border-neutral-300 bg-neutral-050/80 px-4 py-3.5 text-[15px] text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none transition placeholder:text-neutral-500 focus:border-violet-700 focus:bg-white focus:ring-4 focus:ring-violet-200/70 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-500";
 
 export function TextInput({
   label,
@@ -30,7 +30,7 @@ export function TextInput({
 }: TextInputProps) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-sm font-medium text-slate-700">
+      <span className="text-sm font-bold text-neutral-800">
         {label}
         {required ? <span className="text-rose-500"> *</span> : null}
       </span>
@@ -55,9 +55,13 @@ export function TextInput({
           className={baseClassName}
         />
       )}
-      {error ? <span className="text-sm text-rose-600">{error}</span> : null}
+      {error ? (
+        <span className="rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+          {error}
+        </span>
+      ) : null}
       {!error && helperText ? (
-        <span className="text-xs text-slate-500">{helperText}</span>
+        <span className="text-xs font-medium text-neutral-600">{helperText}</span>
       ) : null}
     </label>
   );

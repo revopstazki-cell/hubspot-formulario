@@ -432,36 +432,43 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+    <form onSubmit={handleSubmit} className="space-y-7">
+      <div className="overflow-hidden rounded-[32px] border border-violet-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(32,45,76,0.10)] sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#7B3FF2] text-xl font-bold text-white">
-              T
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-violet-900 text-2xl font-black text-white shadow-[0_16px_36px_rgba(53,0,168,0.22)]">
+              t
+              <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-white bg-violet-400" />
             </div>
             <div>
-              <p className="text-sm font-medium uppercase tracking-widest text-[#7B3FF2]">
-                Tazki
+              <p className="text-2xl font-black lowercase tracking-[-0.04em] text-violet-900">
+                tazki
               </p>
-              <h1 className="text-3xl font-semibold text-slate-950">
+              <h1 className="mt-1 text-3xl font-black tracking-[-0.04em] text-neutral-900 sm:text-4xl">
                 Ficha de cliente
               </h1>
+              <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-neutral-700">
+                Completa y actualiza la información clave del cliente para
+                mantener HubSpot ordenado y listo para la operación.
+              </p>
             </div>
           </div>
-          <div className="rounded-lg border border-[#7B3FF2]/20 bg-[#7B3FF2]/5 px-4 py-3 text-sm text-slate-700">
-            <div className="font-medium text-slate-950">ID del negocio</div>
-            <div>{form.dealId || "No enviado"}</div>
+          <div className="rounded-3xl border border-violet-200 bg-violet-050 px-5 py-4 text-sm text-neutral-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+            <div className="font-extrabold text-neutral-900">ID del negocio</div>
+            <div className="mt-1 font-mono text-xs font-semibold text-violet-900 sm:text-sm">
+              {form.dealId || "No enviado"}
+            </div>
           </div>
         </div>
 
         {errorMessage ? (
-          <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
             {errorMessage}
           </div>
         ) : null}
 
         {successMessage ? (
-          <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
             {successMessage}
           </div>
         ) : null}
@@ -637,7 +644,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         onChange={(contacts) => updateContactList("legalContacts", contacts)}
       />
       {fieldErrors.legalContacts ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
           {fieldErrors.legalContacts}
         </div>
       ) : null}
@@ -710,11 +717,11 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         ) : null}
       </FormSection>
 
-      <div className="flex justify-end rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex justify-end rounded-[28px] border border-violet-200 bg-white/95 p-6 shadow-[0_20px_70px_rgba(32,45,76,0.08)]">
         <button
           type="submit"
           disabled={saving}
-          className="min-h-11 rounded-lg bg-[#7B3FF2] px-6 text-sm font-semibold text-white transition hover:bg-[#6B32D9] focus:outline-none focus:ring-2 focus:ring-[#7B3FF2] focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="min-h-12 rounded-2xl bg-violet-900 px-7 text-sm font-extrabold text-white shadow-[0_16px_36px_rgba(53,0,168,0.22)] transition hover:bg-violet-800 focus:outline-none focus:ring-4 focus:ring-violet-200 disabled:cursor-not-allowed disabled:bg-neutral-400 disabled:shadow-none"
         >
           {saving ? "Guardando ficha..." : "Enviar ficha cliente"}
         </button>
