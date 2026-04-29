@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
 import { ContactSection } from "@/components/ficha-cliente/ContactSection";
@@ -112,6 +113,7 @@ const FIELD_LABELS: Record<string, string> = {
   frecuenciaSolicitudHES: "Frecuencia solicitud HES",
   frecuenciaSolicitudEDP: "Frecuencia solicitud EDP",
   legalContacts: "Contactos de Representante Legal",
+  formSave: "Guardado en HubSpot",
 };
 
 const CONTACT_SECTION_LABELS: Record<ContactListKey, string> = {
@@ -291,6 +293,7 @@ function mapSubmitFieldErrors(
 }
 
 export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
+  const router = useRouter();
   const [form, setForm] = useState<ClientFormState>(initialData);
   const [propertyOptions, setPropertyOptions] = useState<
     Partial<Record<OptionKey, PropertyOption[]>>
@@ -562,17 +565,30 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
       if (!response.ok || !result?.success) {
         const apiFieldErrors = mapSubmitFieldErrors(result, normalizedForm);
-        setFieldErrors((current) => ({ ...current, ...apiFieldErrors }));
+        setFieldErrors((current) => ({
+          ...current,
+          ...(Object.keys(apiFieldErrors).length > 0
+            ? apiFieldErrors
+            : {
+                formSave:
+                  "No pudimos completar el guardado. Intenta nuevamente.",
+              }),
+        }));
         setErrorMessage(GENERAL_SAVE_ERROR);
         return;
       }
 
-      setSuccessMessage("Ficha de cliente enviada correctamente");
       setErrorMessage("");
       setForm(normalizedForm);
       setPersoneriaFile(null);
+      router.push(
+        `/ficha-cliente/gracias?id=${encodeURIComponent(normalizedForm.dealId)}`,
+      );
     } catch (error) {
       console.error(error);
+      setFieldErrors({
+        formSave: "No pudimos completar el guardado. Intenta nuevamente.",
+      });
       setErrorMessage(GENERAL_SAVE_ERROR);
     } finally {
       setSaving(false);

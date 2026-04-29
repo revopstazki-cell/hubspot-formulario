@@ -6,8 +6,11 @@ import {
   type ClientFormState,
 } from "@/lib/clientForm";
 import {
+  CONTACT_SAVE_ERROR,
   EMAIL_FORMAT_ERROR,
   FIELD_REVIEW_ERROR,
+  FILE_UPLOAD_ERROR,
+  FORM_SAVE_ERROR,
   GENERAL_SAVE_ERROR,
   PHONE_FORMAT_ERROR,
   RUT_FORMAT_ERROR,
@@ -24,6 +27,11 @@ import {
 } from "@/lib/hubspotProperties";
 
 export const runtime = "nodejs";
+
+type ContactSectionKey =
+  | "cobranzaContacts"
+  | "facturacionContacts"
+  | "legalContacts";
 
 const DEAL_ERROR_FIELD_MAP: Record<string, string> = {
   [DEAL_PROPERTY_MAP.razonSocial]: "razonSocial",
@@ -124,6 +132,38 @@ function mapErrorToFieldErrors(error: unknown, payload: ClientFormState | null) 
   return fieldErrors;
 }
 
+function mapContactErrorToFieldErrors(
+  error: unknown,
+  payload: ClientFormState | null,
+  sectionKey: ContactSectionKey,
+  contactIndex: number,
+) {
+  const mappedErrors = mapErrorToFieldErrors(error, payload);
+  const contextPrefix = `${sectionKey}.${contactIndex}.`;
+  const contextualErrors = Object.fromEntries(
+    Object.entries(mappedErrors).filter(([key]) => key.startsWith(contextPrefix)),
+  );
+
+  if (Object.keys(contextualErrors).length > 0) {
+    return contextualErrors;
+  }
+
+  return {
+    [`${sectionKey}.${contactIndex}.email`]: CONTACT_SAVE_ERROR,
+  };
+}
+
+function errorResponse(fieldErrors: Record<string, string>) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: GENERAL_SAVE_ERROR,
+      fieldErrors,
+    },
+    { status: 500 },
+  );
+}
+
 export async function POST(request: Request) {
   let payload: ClientFormState | null = null;
 
@@ -160,30 +200,63 @@ export async function POST(request: Request) {
       ...normalizeDealPayload(payload),
     };
 
-    if (personeriaFile instanceof File && personeriaFile.size > 0) {
-      const upload = await uploadFileToHubSpot(personeriaFile);
-      dealProperties[DEAL_PROPERTY_MAP.personeriaArchivo] =
-        await getPersoneriaDealValueForProperty(upload);
+    try {
+      if (personeriaFile instanceof File && personeriaFile.size > 0) {
+        const upload = await uploadFileToHubSpot(personeriaFile);
+        dealProperties[DEAL_PROPERTY_MAP.personeriaArchivo] =
+          await getPersoneriaDealValueForProperty(upload);
+      }
+    } catch (error) {
+      console.error(error);
+
+      return errorResponse({
+        personeriaFile: FILE_UPLOAD_ERROR,
+      });
     }
 
-    await updateDeal(payload.dealId, dealProperties);
+    try {
+      await updateDeal(payload.dealId, dealProperties);
+    } catch (error) {
+      console.error(error);
 
-    const allContacts = [
-      ...payload.cobranzaContacts,
-      ...payload.facturacionContacts,
-      ...payload.legalContacts,
+      const fieldErrors = mapErrorToFieldErrors(error, payload);
+
+      return errorResponse(
+        Object.keys(fieldErrors).length > 0
+          ? fieldErrors
+          : { formSave: FORM_SAVE_ERROR },
+      );
+    }
+
+    const contactSections: Array<{
+      key: ContactSectionKey;
+      contacts: ClientFormState[ContactSectionKey];
+    }> = [
+      { key: "cobranzaContacts", contacts: payload.cobranzaContacts },
+      { key: "facturacionContacts", contacts: payload.facturacionContacts },
+      { key: "legalContacts", contacts: payload.legalContacts },
     ];
 
-    for (const contact of allContacts) {
-      if (!contact.selectedContactId && !contact.email.trim()) {
-        continue;
-      }
+    for (const section of contactSections) {
+      for (const [index, contact] of section.contacts.entries()) {
+        if (!contact.selectedContactId && !contact.email.trim()) {
+          continue;
+        }
 
-      await upsertContactForDeal({
-        contact,
-        dealId: payload.dealId,
-        mergeRoles: true,
-      });
+        try {
+          await upsertContactForDeal({
+            contact,
+            dealId: payload.dealId,
+            mergeRoles: true,
+          });
+        } catch (error) {
+          console.error(error);
+
+          return errorResponse(
+            mapContactErrorToFieldErrors(error, payload, section.key, index),
+          );
+        }
+      }
     }
 
     return NextResponse.json({
@@ -193,13 +266,12 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error(error);
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: GENERAL_SAVE_ERROR,
-        fieldErrors: mapErrorToFieldErrors(error, payload),
-      },
-      { status: 500 },
+    const fieldErrors = mapErrorToFieldErrors(error, payload);
+
+    return errorResponse(
+      Object.keys(fieldErrors).length > 0
+        ? fieldErrors
+        : { formSave: FORM_SAVE_ERROR },
     );
   }
 }

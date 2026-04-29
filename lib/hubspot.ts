@@ -79,8 +79,9 @@ async function parseHubSpotResponse(response: Response) {
       typeof data.message === "string"
         ? data.message
         : "HubSpot devolvió un error.";
+    const details = data ? JSON.stringify(data) : "";
 
-    throw new Error(message);
+    throw new Error([message, details].filter(Boolean).join(" "));
   }
 
   if (text && !contentType.toLowerCase().includes("application/json")) {
