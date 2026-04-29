@@ -36,8 +36,8 @@ type ContactSectionKey =
   | "facturacionContacts"
   | "legalContacts";
 
-// Si esta propiedad no existe en HubSpot, debe crearse en Deals como tipo datetime.
-const FECHA_ENVIO_FICHA_CLIENTE_PROPERTY = "fecha_envio_ficha_cliente";
+const FECHA_INSCRIPCION_FICHA_CLIENTE_PROPERTY =
+  "feccha_inscripcion_ficha_cliente";
 
 const DEAL_ERROR_FIELD_MAP: Record<string, string> = {
   [DEAL_PROPERTY_MAP.razonSocial]: "razonSocial",
@@ -421,7 +421,7 @@ export async function POST(request: Request) {
       ...normalizeDealPayload(payload),
     };
     const now = new Date().toISOString();
-    dealProperties[FECHA_ENVIO_FICHA_CLIENTE_PROPERTY] = now;
+    dealProperties[FECHA_INSCRIPCION_FICHA_CLIENTE_PROPERTY] = now;
 
     try {
       if (personeriaFile instanceof File && personeriaFile.size > 0) {
