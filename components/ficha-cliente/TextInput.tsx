@@ -13,7 +13,7 @@ type TextInputProps = {
 };
 
 const baseClassName =
-  "w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:bg-white";
+  "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#7B3FF2] focus:ring-2 focus:ring-[#7B3FF2]/15";
 
 export function TextInput({
   label,

@@ -1,9 +1,7 @@
 import {
   cleanObject,
   joinHubSpotMultiValue,
-  splitFullName,
   splitHubSpotMultiValue,
-  type ClientFormState,
   type ContactDraft,
   type ContactSearchResult,
   type HubSpotContactRecord,
@@ -13,7 +11,6 @@ import {
   CONTACT_PROPERTIES,
   CONTACT_PROPERTY_MAP,
   DEAL_PROPERTIES,
-  RESPONSABLE_IT_ROLE,
 } from "@/lib/hubspotProperties";
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com";
@@ -151,7 +148,6 @@ export async function searchContacts(query: string) {
     lastname: String(contact.properties[CONTACT_PROPERTY_MAP.lastname] ?? ""),
     email: String(contact.properties[CONTACT_PROPERTY_MAP.email] ?? ""),
     phone: String(contact.properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
-    jobtitle: String(contact.properties[CONTACT_PROPERTY_MAP.jobtitle] ?? ""),
     cargo: String(contact.properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
     tipoDeContacto: splitHubSpotMultiValue(
       String(contact.properties[CONTACT_PROPERTY_MAP.tipoDeContacto] ?? ""),
@@ -248,9 +244,7 @@ function getContactPropertiesPayload(
     [CONTACT_PROPERTY_MAP.lastname]: contact.lastname,
     [CONTACT_PROPERTY_MAP.email]: contact.email,
     [CONTACT_PROPERTY_MAP.phone]: contact.phone,
-    [CONTACT_PROPERTY_MAP.jobtitle]: contact.jobtitle,
     [CONTACT_PROPERTY_MAP.cargo]: contact.cargo,
-    [CONTACT_PROPERTY_MAP.observaciones]: contact.observaciones,
     [CONTACT_PROPERTY_MAP.idDeNegocio]: dealId,
     [CONTACT_PROPERTY_MAP.tipoDeContacto]: joinHubSpotMultiValue(roles),
   });
@@ -358,64 +352,6 @@ export async function upsertContactForDeal(params: {
   };
 }
 
-export function buildDerivedContactDrafts(form: ClientFormState) {
-  const cobranzaName = splitFullName(form.nombreCobranza);
-  const facturacionName = splitFullName(form.nombreFacturacion);
-  const representanteName = splitFullName(form.nombreRepresentanteLegal);
-
-  return [
-    {
-      draft: {
-        localId: "derived-cobranza",
-        selectedContactId: "",
-        firstname: cobranzaName.firstname,
-        lastname: cobranzaName.lastname,
-        email: form.correoCobranza,
-        phone: form.telefonoCobranza,
-        jobtitle: form.cargoCobranza,
-        cargo: form.cargoCobranza,
-        observaciones: form.observacionesCobranza,
-        tipoDeContacto: ["Cobranza/Proveedores"],
-      } satisfies ContactDraft,
-      mergeRoles: true,
-    },
-    {
-      draft: {
-        localId: "derived-facturacion",
-        selectedContactId: "",
-        firstname: facturacionName.firstname,
-        lastname: facturacionName.lastname,
-        email: form.correoFacturacion,
-        phone: form.telefonoFacturacion,
-        jobtitle: form.cargoFacturacion,
-        cargo: form.cargoFacturacion,
-        observaciones: "",
-        tipoDeContacto: ["Facturacion"],
-      } satisfies ContactDraft,
-      mergeRoles: true,
-    },
-    {
-      draft: {
-        localId: "derived-representante",
-        selectedContactId: "",
-        firstname: representanteName.firstname,
-        lastname: representanteName.lastname,
-        email: form.correoRepresentanteLegal,
-        phone: "",
-        jobtitle: "",
-        cargo: "",
-        observaciones: "",
-        tipoDeContacto: ["Representante Legal"],
-      } satisfies ContactDraft,
-      mergeRoles: true,
-    },
-  ];
-}
-
 export function getPersoneriaDealValue(upload: HubSpotFileUploadResult) {
   return String(upload.id || upload.url || upload.defaultHostingUrl || "");
-}
-
-export function getResponsableITRoles(contact: ContactDraft) {
-  return Array.from(new Set([RESPONSABLE_IT_ROLE, ...contact.tipoDeContacto]));
 }

@@ -3,25 +3,24 @@
 import { useMemo, useState } from "react";
 
 import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
-import { ContactBlock } from "@/components/ficha-cliente/ContactBlock";
+import { ContactSection } from "@/components/ficha-cliente/ContactSection";
 import { FileUpload } from "@/components/ficha-cliente/FileUpload";
 import { FormSection } from "@/components/ficha-cliente/FormSection";
 import { SelectInput } from "@/components/ficha-cliente/SelectInput";
 import { TextInput } from "@/components/ficha-cliente/TextInput";
 import {
   createEmptyContactDraft,
-  mapHubSpotContactToDraft,
+  withPrimaryContactDealFields,
   type ClientFormState,
   type ContactDraft,
-  type ContactSearchResult,
 } from "@/lib/clientForm";
 import {
+  COBRANZA_ROLE,
   DEFAULT_FORM_REQUIRED_FIELDS,
+  FACTURACION_ROLE,
   FREQUENCY_OPTIONS,
   PLATFORM_OPTIONS,
   REQUIREMENT_OPTIONS,
-  RESPONSABLE_IT_ROLE,
-  STAKEHOLDER_ROLE_OPTIONS,
   YES_NO_OPTIONS,
 } from "@/lib/hubspotProperties";
 
@@ -29,12 +28,26 @@ type FichaClienteFormProps = {
   initialData: ClientFormState;
 };
 
+type ContactListKey = "cobranzaContacts" | "facturacionContacts";
+
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isValidInternationalPhone(value: string) {
+  const compactValue = value.replace(/[\s()-]/g, "");
+  return /^\+[1-9]\d{6,14}$/.test(compactValue);
+}
+
+function createContact(role: string) {
+  return createEmptyContactDraft([role]);
+}
 
 export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
   const [form, setForm] = useState<ClientFormState>(initialData);
   const [personeriaFile, setPersoneriaFile] = useState<File | null>(null);
-  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -58,132 +71,83 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     }));
   }
 
-  function updateContactList(
-    key: "responsablesIT" | "stakeholders",
-    nextContacts: ContactDraft[],
-  ) {
+  function updateContactList(key: ContactListKey, contacts: ContactDraft[]) {
     setForm((current) => ({
       ...current,
-      [key]: nextContacts,
+      [key]: contacts,
     }));
   }
 
-  function handleContactChange(
-    key: "responsablesIT" | "stakeholders",
-    localId: string,
-    nextContact: ContactDraft,
+  function validateContactList(
+    key: ContactListKey,
+    contacts: ContactDraft[],
+    errors: Record<string, string>,
   ) {
-    updateContactList(
-      key,
-      form[key].map((contact) =>
-        contact.localId === localId ? nextContact : contact,
-      ),
-    );
-  }
+    for (const [index, contact] of contacts.entries()) {
+      if (!contact.firstname.trim()) {
+        errors[`${key}.${index}.firstname`] = "El nombre es obligatorio.";
+      }
 
-  function handleSelectExisting(
-    key: "responsablesIT" | "stakeholders",
-    localId: string,
-    contact: ContactSearchResult,
-  ) {
-    const mapped = mapHubSpotContactToDraft(contact);
-    handleContactChange(key, localId, {
-      ...mapped,
-      localId,
-      tipoDeContacto:
-        key === "responsablesIT"
-          ? Array.from(
-              new Set([RESPONSABLE_IT_ROLE, ...mapped.tipoDeContacto]),
-            )
-          : mapped.tipoDeContacto,
-    });
-  }
+      if (!contact.email.trim()) {
+        errors[`${key}.${index}.email`] = "El correo es obligatorio.";
+      } else if (!isValidEmail(contact.email.trim())) {
+        errors[`${key}.${index}.email`] = "Ingresa un correo valido.";
+      }
 
-  function addContact(key: "responsablesIT" | "stakeholders") {
-    updateContactList(key, [
-      ...form[key],
-      createEmptyContactDraft(
-        key === "responsablesIT" ? [RESPONSABLE_IT_ROLE] : [],
-      ),
-    ]);
-  }
+      if (!contact.phone.trim()) {
+        errors[`${key}.${index}.phone`] = "El telefono es obligatorio.";
+      } else if (!isValidInternationalPhone(contact.phone.trim())) {
+        errors[`${key}.${index}.phone`] =
+          "Usa formato internacional, por ejemplo +56912345678.";
+      }
 
-  function removeContact(key: "responsablesIT" | "stakeholders", localId: string) {
-    const next = form[key].filter((contact) => contact.localId !== localId);
-
-    updateContactList(
-      key,
-      next.length > 0
-        ? next
-        : [createEmptyContactDraft(key === "responsablesIT" ? [RESPONSABLE_IT_ROLE] : [])],
-    );
+      if (!contact.cargo.trim()) {
+        errors[`${key}.${index}.cargo`] = "Selecciona un cargo.";
+      }
+    }
   }
 
   function validateForm() {
     const errors: Record<string, string> = {};
+    const normalizedForm = withPrimaryContactDealFields(form);
 
-    if (!form.dealId) {
+    if (!normalizedForm.dealId) {
       errors.dealId = "No encontramos el ID del negocio en la URL.";
     }
 
     for (const key of DEFAULT_FORM_REQUIRED_FIELDS) {
-      if (!String(form[key] ?? "").trim()) {
+      if (!String(normalizedForm[key] ?? "").trim()) {
         errors[key] = "Este campo es obligatorio.";
       }
     }
 
-    const emailFields = [
-      "correoCobranza",
-      "correoFacturacion",
+    const directEmailFields = [
       "correoCasillaDTE",
       "correoRepresentanteLegal",
     ] as const;
 
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const key of directEmailFields) {
+      const value = normalizedForm[key].trim();
 
-    for (const key of emailFields) {
-      const value = form[key].trim();
-      if (value && !emailPattern.test(value)) {
+      if (value && !isValidEmail(value)) {
         errors[key] = "Ingresa un correo valido.";
       }
     }
+
+    validateContactList("cobranzaContacts", form.cobranzaContacts, errors);
+    validateContactList(
+      "facturacionContacts",
+      form.facturacionContacts,
+      errors,
+    );
 
     if (personeriaFile && personeriaFile.size > MAX_FILE_SIZE_BYTES) {
       errors.personeriaFile = "El archivo no puede superar 10 MB.";
     }
 
-    if (!personeriaFile && !form.personeriaArchivo) {
-      errors.personeriaFile = "Debes adjuntar la personeria o mantener una ya cargada.";
-    }
-
-    for (const [index, contact] of form.responsablesIT.entries()) {
-      if (!contact.firstname.trim()) {
-        errors[`responsablesIT.${index}.firstname`] = "El nombre es obligatorio.";
-      }
-
-      if (!contact.email.trim() && !contact.selectedContactId) {
-        errors[`responsablesIT.${index}.email`] =
-          "Agrega correo o selecciona un contacto existente.";
-      }
-
-      if (contact.email.trim() && !emailPattern.test(contact.email.trim())) {
-        errors[`responsablesIT.${index}.email`] = "Correo invalido.";
-      }
-    }
-
-    for (const [index, contact] of form.stakeholders.entries()) {
-      if (!contact.firstname.trim()) {
-        errors[`stakeholders.${index}.firstname`] = "El nombre es obligatorio.";
-      }
-
-      if (!contact.email.trim() && !contact.selectedContactId) {
-        errors[`stakeholders.${index}.email`] =
-          "Agrega correo o selecciona un contacto existente.";
-      }
-
-      if (contact.email.trim() && !emailPattern.test(contact.email.trim())) {
-        errors[`stakeholders.${index}.email`] = "Correo invalido.";
-      }
+    if (!personeriaFile && !normalizedForm.personeriaArchivo) {
+      errors.personeriaFile =
+        "Debes adjuntar la personeria o mantener una ya cargada.";
     }
 
     return errors;
@@ -205,8 +169,12 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     setSaving(true);
 
     try {
+      const normalizedForm = withPrimaryContactDealFields({
+        ...form,
+        linkFichaCliente: generatedLink,
+      });
       const body = new FormData();
-      body.append("payload", JSON.stringify({ ...form, linkFichaCliente: generatedLink }));
+      body.append("payload", JSON.stringify(normalizedForm));
 
       if (personeriaFile) {
         body.append("personeriaFile", personeriaFile);
@@ -224,15 +192,14 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
       };
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || result.message || "No pudimos guardar la ficha.");
+        throw new Error(
+          result.error || result.message || "No pudimos guardar la ficha.",
+        );
       }
 
       setSuccessMessage("Ficha de cliente enviada correctamente");
       setErrorMessage("");
-      setForm((current) => ({
-        ...current,
-        linkFichaCliente: generatedLink,
-      }));
+      setForm(normalizedForm);
       setPersoneriaFile(null);
     } catch (error) {
       setErrorMessage(
@@ -244,35 +211,36 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-medium uppercase tracking-[0.25em] text-emerald-600">
-              Tazki
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-              Ficha de cliente
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Completa o actualiza la informacion del negocio. Todo se guarda a
-              traves de rutas backend, sin exponer credenciales en el navegador.
-            </p>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#7B3FF2] text-xl font-bold text-white">
+              T
+            </div>
+            <div>
+              <p className="text-sm font-medium uppercase tracking-widest text-[#7B3FF2]">
+                Tazki
+              </p>
+              <h1 className="text-3xl font-semibold text-slate-950">
+                Ficha de cliente
+              </h1>
+            </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            <div className="font-medium text-slate-900">ID del negocio</div>
+          <div className="rounded-lg border border-[#7B3FF2]/20 bg-[#7B3FF2]/5 px-4 py-3 text-sm text-slate-700">
+            <div className="font-medium text-slate-950">ID del negocio</div>
             <div>{form.dealId || "No enviado"}</div>
           </div>
         </div>
 
         {errorMessage ? (
-          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {errorMessage}
           </div>
         ) : null}
 
         {successMessage ? (
-          <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {successMessage}
           </div>
         ) : null}
@@ -346,39 +314,18 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         />
       </FormSection>
 
-      <FormSection title="Datos - Area cobranza / proveedores">
-        <TextInput
-          label="Nombre encargado"
-          name="nombreCobranza"
-          value={form.nombreCobranza}
-          onChange={(value) => updateField("nombreCobranza", value)}
-          required
-          error={fieldErrors.nombreCobranza}
-        />
-        <TextInput
-          label="Correo encargado"
-          name="correoCobranza"
-          value={form.correoCobranza}
-          onChange={(value) => updateField("correoCobranza", value)}
-          type="email"
-          required
-          error={fieldErrors.correoCobranza}
-        />
-        <TextInput
-          label="Telefono encargado"
-          name="telefonoCobranza"
-          value={form.telefonoCobranza}
-          onChange={(value) => updateField("telefonoCobranza", value)}
-          type="tel"
-          required
-          error={fieldErrors.telefonoCobranza}
-        />
-        <TextInput
-          label="Cargo persona cobranza"
-          name="cargoCobranza"
-          value={form.cargoCobranza}
-          onChange={(value) => updateField("cargoCobranza", value)}
-        />
+      <ContactSection
+        title="Datos de Cobranza / Proveedores"
+        description="Agrega uno o mas contactos para cobranza y proveedores."
+        addLabel="+ Agregar contacto"
+        fieldPrefix="cobranzaContacts"
+        contacts={form.cobranzaContacts}
+        errors={fieldErrors}
+        createContact={() => createContact(COBRANZA_ROLE)}
+        onChange={(contacts) => updateContactList("cobranzaContacts", contacts)}
+      />
+
+      <FormSection title="Datos - Plataforma proveedores">
         <TextInput
           label="Observaciones cobranza"
           name="observacionesCobranza"
@@ -406,44 +353,27 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           label="Comentario plataforma creacion de proveedores"
           name="comentarioPlataformaProveedores"
           value={form.comentarioPlataformaProveedores}
-          onChange={(value) => updateField("comentarioPlataformaProveedores", value)}
+          onChange={(value) =>
+            updateField("comentarioPlataformaProveedores", value)
+          }
           multiline
         />
       </FormSection>
 
+      <ContactSection
+        title="Datos de Facturación"
+        description="Agrega uno o mas contactos para recepcion y gestion de facturas."
+        addLabel="+ Agregar contacto"
+        fieldPrefix="facturacionContacts"
+        contacts={form.facturacionContacts}
+        errors={fieldErrors}
+        createContact={() => createContact(FACTURACION_ROLE)}
+        onChange={(contacts) =>
+          updateContactList("facturacionContacts", contacts)
+        }
+      />
+
       <FormSection title="Datos - Recepcion factura">
-        <TextInput
-          label="Nombre contacto facturacion"
-          name="nombreFacturacion"
-          value={form.nombreFacturacion}
-          onChange={(value) => updateField("nombreFacturacion", value)}
-          required
-          error={fieldErrors.nombreFacturacion}
-        />
-        <TextInput
-          label="Correo contacto facturacion"
-          name="correoFacturacion"
-          value={form.correoFacturacion}
-          onChange={(value) => updateField("correoFacturacion", value)}
-          type="email"
-          required
-          error={fieldErrors.correoFacturacion}
-        />
-        <TextInput
-          label="Telefono contacto facturacion"
-          name="telefonoFacturacion"
-          value={form.telefonoFacturacion}
-          onChange={(value) => updateField("telefonoFacturacion", value)}
-          type="tel"
-          required
-          error={fieldErrors.telefonoFacturacion}
-        />
-        <TextInput
-          label="Cargo persona facturacion"
-          name="cargoFacturacion"
-          value={form.cargoFacturacion}
-          onChange={(value) => updateField("cargoFacturacion", value)}
-        />
         <TextInput
           label="Correo casilla DTE"
           name="correoCasillaDTE"
@@ -528,86 +458,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         />
       </FormSection>
 
-      <div className="space-y-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">
-              Contactos adicionales
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Puedes asociar responsables de IT y stakeholders existentes o nuevos
-              al negocio.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => addContact("responsablesIT")}
-              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
-            >
-              + Agregar Responsable IT
-            </button>
-            <button
-              type="button"
-              onClick={() => addContact("stakeholders")}
-              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
-            >
-              + Agregar Stakeholder
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-5">
-          {form.responsablesIT.map((contact, index) => (
-            <ContactBlock
-              key={contact.localId}
-              title={`Responsable IT ${index + 1}`}
-              contact={contact}
-              searchValue={searchQueries[contact.localId] ?? ""}
-              onSearchChange={(value) =>
-                setSearchQueries((current) => ({
-                  ...current,
-                  [contact.localId]: value,
-                }))
-              }
-              onSelectExisting={(selected) =>
-                handleSelectExisting("responsablesIT", contact.localId, selected)
-              }
-              onChange={(next) =>
-                handleContactChange("responsablesIT", contact.localId, next)
-              }
-              onRemove={() => removeContact("responsablesIT", contact.localId)}
-              allowRemove={form.responsablesIT.length > 1}
-            />
-          ))}
-
-          {form.stakeholders.map((contact, index) => (
-            <ContactBlock
-              key={contact.localId}
-              title={`Stakeholder ${index + 1}`}
-              contact={contact}
-              roleOptions={STAKEHOLDER_ROLE_OPTIONS}
-              searchValue={searchQueries[contact.localId] ?? ""}
-              onSearchChange={(value) =>
-                setSearchQueries((current) => ({
-                  ...current,
-                  [contact.localId]: value,
-                }))
-              }
-              onSelectExisting={(selected) =>
-                handleSelectExisting("stakeholders", contact.localId, selected)
-              }
-              onChange={(next) =>
-                handleContactChange("stakeholders", contact.localId, next)
-              }
-              onRemove={() => removeContact("stakeholders", contact.localId)}
-              allowRemove={form.stakeholders.length > 1}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div className="text-sm text-slate-500">
           Solo enviaremos a HubSpot campos con contenido. No sobreescribimos datos
           existentes con valores vacios.
@@ -615,7 +466,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="min-h-11 rounded-lg bg-[#7B3FF2] px-6 text-sm font-semibold text-white transition hover:bg-[#6B32D9] focus:outline-none focus:ring-2 focus:ring-[#7B3FF2] focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
           {saving ? "Guardando ficha..." : "Enviar ficha cliente"}
         </button>

@@ -21,11 +21,11 @@ export function FileUpload({
         {label}
         {required ? <span className="text-rose-500"> *</span> : null}
       </span>
-      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5">
+      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5">
         <input
           type="file"
           onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
+          className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[#7B3FF2] file:px-4 file:py-2 file:text-sm file:font-medium file:text-white"
         />
         {fileName ? (
           <p className="mt-3 text-sm text-slate-600">Archivo seleccionado: {fileName}</p>

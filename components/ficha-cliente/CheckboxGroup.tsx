@@ -40,7 +40,7 @@ export function CheckboxGroup({
               type="checkbox"
               checked={values.includes(option.value)}
               onChange={() => toggleValue(option.value)}
-              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+              className="h-4 w-4 rounded border-slate-300 text-[#7B3FF2] focus:ring-[#7B3FF2]"
             />
             <span>{option.label}</span>
           </label>

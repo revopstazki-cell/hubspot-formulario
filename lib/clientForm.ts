@@ -1,7 +1,9 @@
 import {
+  COBRANZA_ROLE,
   CONTACT_PROPERTY_MAP,
   DEAL_PROPERTY_MAP,
-  RESPONSABLE_IT_ROLE,
+  FACTURACION_ROLE,
+  LEGAL_REPRESENTATIVE_ROLE,
 } from "@/lib/hubspotProperties";
 
 export type ContactDraft = {
@@ -11,9 +13,7 @@ export type ContactDraft = {
   lastname: string;
   email: string;
   phone: string;
-  jobtitle: string;
   cargo: string;
-  observaciones: string;
   tipoDeContacto: string[];
 };
 
@@ -50,8 +50,8 @@ export type ClientFormState = {
   frecuenciaSolicitudMIGO: string;
   frecuenciaSolicitudHES: string;
   frecuenciaSolicitudEDP: string;
-  responsablesIT: ContactDraft[];
-  stakeholders: ContactDraft[];
+  cobranzaContacts: ContactDraft[];
+  facturacionContacts: ContactDraft[];
 };
 
 export type HubSpotContactRecord = {
@@ -70,7 +70,6 @@ export type ContactSearchResult = {
   lastname: string;
   email: string;
   phone: string;
-  jobtitle: string;
   cargo: string;
   tipoDeContacto: string[];
 };
@@ -87,9 +86,7 @@ export function createEmptyContactDraft(defaultRoles: string[] = []): ContactDra
     lastname: "",
     email: "",
     phone: "",
-    jobtitle: "",
     cargo: "",
-    observaciones: "",
     tipoDeContacto: defaultRoles,
   };
 }
@@ -128,8 +125,8 @@ export function createEmptyClientFormState(dealId = ""): ClientFormState {
     frecuenciaSolicitudMIGO: "",
     frecuenciaSolicitudHES: "",
     frecuenciaSolicitudEDP: "",
-    responsablesIT: [createEmptyContactDraft([RESPONSABLE_IT_ROLE])],
-    stakeholders: [createEmptyContactDraft()],
+    cobranzaContacts: [createEmptyContactDraft([COBRANZA_ROLE])],
+    facturacionContacts: [createEmptyContactDraft([FACTURACION_ROLE])],
   };
 }
 
@@ -163,6 +160,10 @@ export function splitFullName(fullName: string) {
   };
 }
 
+export function getFullName(contact: ContactDraft) {
+  return [contact.firstname, contact.lastname].filter(Boolean).join(" ").trim();
+}
+
 export function mapHubSpotContactToDraft(
   contact: HubSpotContactRecord | ContactSearchResult,
 ): ContactDraft {
@@ -174,7 +175,6 @@ export function mapHubSpotContactToDraft(
           lastname: contact.lastname,
           email: contact.email,
           phone: contact.phone,
-          jobtitle: contact.jobtitle,
           cargo: contact.cargo,
           tipo_de_contacto: joinHubSpotMultiValue(contact.tipoDeContacto),
         };
@@ -186,13 +186,42 @@ export function mapHubSpotContactToDraft(
     lastname: String(properties[CONTACT_PROPERTY_MAP.lastname] ?? ""),
     email: String(properties[CONTACT_PROPERTY_MAP.email] ?? ""),
     phone: String(properties[CONTACT_PROPERTY_MAP.phone] ?? ""),
-    jobtitle: String(properties[CONTACT_PROPERTY_MAP.jobtitle] ?? ""),
     cargo: String(properties[CONTACT_PROPERTY_MAP.cargo] ?? ""),
-    observaciones: String(properties[CONTACT_PROPERTY_MAP.observaciones] ?? ""),
     tipoDeContacto: splitHubSpotMultiValue(
       String(properties[CONTACT_PROPERTY_MAP.tipoDeContacto] ?? ""),
     ),
   };
+}
+
+function contactFromDealFields(params: {
+  fullName: string;
+  email: string;
+  phone: string;
+  cargo: string;
+  role: string;
+}) {
+  const name = splitFullName(params.fullName);
+
+  return {
+    ...createEmptyContactDraft([params.role]),
+    firstname: name.firstname,
+    lastname: name.lastname,
+    email: params.email,
+    phone: params.phone,
+    cargo: params.cargo,
+  };
+}
+
+function hasRole(contact: ContactDraft, role: string) {
+  const compatibleFacturacionRoles = new Set(["Facturacion", FACTURACION_ROLE]);
+
+  if (role === FACTURACION_ROLE) {
+    return contact.tipoDeContacto.some((value) =>
+      compatibleFacturacionRoles.has(value),
+    );
+  }
+
+  return contact.tipoDeContacto.includes(role);
 }
 
 export function mapHubSpotDealToFormState(
@@ -201,11 +230,6 @@ export function mapHubSpotDealToFormState(
 ): ClientFormState {
   const form = createEmptyClientFormState(deal.id);
   const properties = deal.properties;
-  const derivedOnlyRoles = new Set([
-    "Cobranza/Proveedores",
-    "Facturacion",
-    "Representante Legal",
-  ]);
 
   for (const [key, propertyName] of Object.entries(DEAL_PROPERTY_MAP)) {
     const value = properties[propertyName];
@@ -218,33 +242,60 @@ export function mapHubSpotDealToFormState(
     form[key as keyof ClientFormState] = String(value ?? "") as never;
   }
 
-  const responsablesIT = associatedContacts
-    .map(mapHubSpotContactToDraft)
-    .filter((contact) => {
-      const roles = contact.tipoDeContacto;
-      return roles.includes(RESPONSABLE_IT_ROLE) && roles.length === 1;
-    });
+  const contactDrafts = associatedContacts.map(mapHubSpotContactToDraft);
+  const cobranzaContacts = contactDrafts.filter((contact) =>
+    hasRole(contact, COBRANZA_ROLE),
+  );
+  const facturacionContacts = contactDrafts.filter((contact) =>
+    hasRole(contact, FACTURACION_ROLE),
+  );
 
-  const stakeholders = associatedContacts
-    .map(mapHubSpotContactToDraft)
-    .filter((contact) => {
-      const roles = contact.tipoDeContacto;
-      return (
-        roles.length > 0 &&
-        !roles.every((role) => derivedOnlyRoles.has(role)) &&
-        !(roles.includes(RESPONSABLE_IT_ROLE) && roles.length === 1)
-      );
-    });
+  form.cobranzaContacts =
+    cobranzaContacts.length > 0
+      ? cobranzaContacts
+      : [
+          contactFromDealFields({
+            fullName: form.nombreCobranza,
+            email: form.correoCobranza,
+            phone: form.telefonoCobranza,
+            cargo: form.cargoCobranza,
+            role: COBRANZA_ROLE,
+          }),
+        ];
 
-  if (responsablesIT.length > 0) {
-    form.responsablesIT = responsablesIT;
-  }
+  form.facturacionContacts =
+    facturacionContacts.length > 0
+      ? facturacionContacts
+      : [
+          contactFromDealFields({
+            fullName: form.nombreFacturacion,
+            email: form.correoFacturacion,
+            phone: form.telefonoFacturacion,
+            cargo: form.cargoFacturacion,
+            role: FACTURACION_ROLE,
+          }),
+        ];
 
-  if (stakeholders.length > 0) {
-    form.stakeholders = stakeholders;
-  }
+  return withPrimaryContactDealFields(form);
+}
 
-  return form;
+export function withPrimaryContactDealFields(form: ClientFormState) {
+  const cobranza = form.cobranzaContacts[0];
+  const facturacion = form.facturacionContacts[0];
+
+  return {
+    ...form,
+    nombreCobranza: cobranza ? getFullName(cobranza) : form.nombreCobranza,
+    correoCobranza: cobranza?.email ?? form.correoCobranza,
+    telefonoCobranza: cobranza?.phone ?? form.telefonoCobranza,
+    cargoCobranza: cobranza?.cargo ?? form.cargoCobranza,
+    nombreFacturacion: facturacion
+      ? getFullName(facturacion)
+      : form.nombreFacturacion,
+    correoFacturacion: facturacion?.email ?? form.correoFacturacion,
+    telefonoFacturacion: facturacion?.phone ?? form.telefonoFacturacion,
+    cargoFacturacion: facturacion?.cargo ?? form.cargoFacturacion,
+  };
 }
 
 export function cleanObject<T extends Record<string, unknown>>(input: T) {
@@ -260,40 +311,70 @@ export function cleanObject<T extends Record<string, unknown>>(input: T) {
 }
 
 export function getDealUpdatePayload(form: ClientFormState) {
+  const normalizedForm = withPrimaryContactDealFields(form);
+
   return cleanObject({
-    [DEAL_PROPERTY_MAP.linkFichaCliente]: form.linkFichaCliente,
-    [DEAL_PROPERTY_MAP.razonSocial]: form.razonSocial,
-    [DEAL_PROPERTY_MAP.rutEmpresa]: form.rutEmpresa,
-    [DEAL_PROPERTY_MAP.giroEmpresa]: form.giroEmpresa,
-    [DEAL_PROPERTY_MAP.fechaPublicacionEscritura]: form.fechaPublicacionEscritura,
-    [DEAL_PROPERTY_MAP.notariaEscrituraPublica]: form.notariaEscrituraPublica,
-    [DEAL_PROPERTY_MAP.direccionFacturacion]: form.direccionFacturacion,
-    [DEAL_PROPERTY_MAP.comuna]: form.comuna,
-    [DEAL_PROPERTY_MAP.ciudadEmpresa]: form.ciudadEmpresa,
-    [DEAL_PROPERTY_MAP.nombreCobranza]: form.nombreCobranza,
-    [DEAL_PROPERTY_MAP.correoCobranza]: form.correoCobranza,
-    [DEAL_PROPERTY_MAP.telefonoCobranza]: form.telefonoCobranza,
-    [DEAL_PROPERTY_MAP.cargoCobranza]: form.cargoCobranza,
-    [DEAL_PROPERTY_MAP.observacionesCobranza]: form.observacionesCobranza,
+    [DEAL_PROPERTY_MAP.linkFichaCliente]: normalizedForm.linkFichaCliente,
+    [DEAL_PROPERTY_MAP.razonSocial]: normalizedForm.razonSocial,
+    [DEAL_PROPERTY_MAP.rutEmpresa]: normalizedForm.rutEmpresa,
+    [DEAL_PROPERTY_MAP.giroEmpresa]: normalizedForm.giroEmpresa,
+    [DEAL_PROPERTY_MAP.fechaPublicacionEscritura]:
+      normalizedForm.fechaPublicacionEscritura,
+    [DEAL_PROPERTY_MAP.notariaEscrituraPublica]:
+      normalizedForm.notariaEscrituraPublica,
+    [DEAL_PROPERTY_MAP.direccionFacturacion]:
+      normalizedForm.direccionFacturacion,
+    [DEAL_PROPERTY_MAP.comuna]: normalizedForm.comuna,
+    [DEAL_PROPERTY_MAP.ciudadEmpresa]: normalizedForm.ciudadEmpresa,
+    [DEAL_PROPERTY_MAP.nombreCobranza]: normalizedForm.nombreCobranza,
+    [DEAL_PROPERTY_MAP.correoCobranza]: normalizedForm.correoCobranza,
+    [DEAL_PROPERTY_MAP.telefonoCobranza]: normalizedForm.telefonoCobranza,
+    [DEAL_PROPERTY_MAP.cargoCobranza]: normalizedForm.cargoCobranza,
+    [DEAL_PROPERTY_MAP.observacionesCobranza]:
+      normalizedForm.observacionesCobranza,
     [DEAL_PROPERTY_MAP.existePlataformaProveedores]:
-      form.existePlataformaProveedores,
+      normalizedForm.existePlataformaProveedores,
     [DEAL_PROPERTY_MAP.nombrePlataformaProveedores]:
-      form.nombrePlataformaProveedores,
+      normalizedForm.nombrePlataformaProveedores,
     [DEAL_PROPERTY_MAP.comentarioPlataformaProveedores]:
-      form.comentarioPlataformaProveedores,
-    [DEAL_PROPERTY_MAP.nombreFacturacion]: form.nombreFacturacion,
-    [DEAL_PROPERTY_MAP.correoFacturacion]: form.correoFacturacion,
-    [DEAL_PROPERTY_MAP.telefonoFacturacion]: form.telefonoFacturacion,
-    [DEAL_PROPERTY_MAP.cargoFacturacion]: form.cargoFacturacion,
-    [DEAL_PROPERTY_MAP.correoCasillaDTE]: form.correoCasillaDTE,
-    [DEAL_PROPERTY_MAP.nombreRepresentanteLegal]: form.nombreRepresentanteLegal,
-    [DEAL_PROPERTY_MAP.rutRepresentanteLegal]: form.rutRepresentanteLegal,
-    [DEAL_PROPERTY_MAP.correoRepresentanteLegal]: form.correoRepresentanteLegal,
-    [DEAL_PROPERTY_MAP.requerimientoFacturacion]:
-      joinHubSpotMultiValue(form.requerimientoFacturacion),
-    [DEAL_PROPERTY_MAP.frecuenciaSolicitudOC]: form.frecuenciaSolicitudOC,
-    [DEAL_PROPERTY_MAP.frecuenciaSolicitudMIGO]: form.frecuenciaSolicitudMIGO,
-    [DEAL_PROPERTY_MAP.frecuenciaSolicitudHES]: form.frecuenciaSolicitudHES,
-    [DEAL_PROPERTY_MAP.frecuenciaSolicitudEDP]: form.frecuenciaSolicitudEDP,
+      normalizedForm.comentarioPlataformaProveedores,
+    [DEAL_PROPERTY_MAP.nombreFacturacion]: normalizedForm.nombreFacturacion,
+    [DEAL_PROPERTY_MAP.correoFacturacion]: normalizedForm.correoFacturacion,
+    [DEAL_PROPERTY_MAP.telefonoFacturacion]:
+      normalizedForm.telefonoFacturacion,
+    [DEAL_PROPERTY_MAP.cargoFacturacion]: normalizedForm.cargoFacturacion,
+    [DEAL_PROPERTY_MAP.correoCasillaDTE]: normalizedForm.correoCasillaDTE,
+    [DEAL_PROPERTY_MAP.nombreRepresentanteLegal]:
+      normalizedForm.nombreRepresentanteLegal,
+    [DEAL_PROPERTY_MAP.rutRepresentanteLegal]:
+      normalizedForm.rutRepresentanteLegal,
+    [DEAL_PROPERTY_MAP.correoRepresentanteLegal]:
+      normalizedForm.correoRepresentanteLegal,
+    [DEAL_PROPERTY_MAP.requerimientoFacturacion]: joinHubSpotMultiValue(
+      normalizedForm.requerimientoFacturacion,
+    ),
+    [DEAL_PROPERTY_MAP.frecuenciaSolicitudOC]:
+      normalizedForm.frecuenciaSolicitudOC,
+    [DEAL_PROPERTY_MAP.frecuenciaSolicitudMIGO]:
+      normalizedForm.frecuenciaSolicitudMIGO,
+    [DEAL_PROPERTY_MAP.frecuenciaSolicitudHES]:
+      normalizedForm.frecuenciaSolicitudHES,
+    [DEAL_PROPERTY_MAP.frecuenciaSolicitudEDP]:
+      normalizedForm.frecuenciaSolicitudEDP,
   });
+}
+
+export function buildLegalRepresentativeContactDraft(form: ClientFormState) {
+  const representanteName = splitFullName(form.nombreRepresentanteLegal);
+
+  return {
+    localId: "derived-representante",
+    selectedContactId: "",
+    firstname: representanteName.firstname,
+    lastname: representanteName.lastname,
+    email: form.correoRepresentanteLegal,
+    phone: "",
+    cargo: "",
+    tipoDeContacto: [LEGAL_REPRESENTATIVE_ROLE],
+  } satisfies ContactDraft;
 }

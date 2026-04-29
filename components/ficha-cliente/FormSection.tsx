@@ -12,7 +12,7 @@ export function FormSection({
   children,
 }: FormSectionProps) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
         {description ? (

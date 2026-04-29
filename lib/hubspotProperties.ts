@@ -40,7 +40,6 @@ export const CONTACT_PROPERTY_MAP = {
   lastname: "lastname",
   email: "email",
   phone: "phone",
-  jobtitle: "jobtitle",
   cargo: "cargo",
   tipoDeContacto: "tipo_de_contacto",
   observaciones: "observaciones",
@@ -83,29 +82,18 @@ export const REQUIREMENT_OPTIONS = [
   { label: "EDP", value: "EDP" },
 ];
 
-export const STAKEHOLDER_ROLE_OPTIONS = [
-  "Tomador de decision",
-  "Compras",
-  "Pagos",
-  "Administracion",
-  "Facturacion",
-  "Casilla de DTE",
-  "Champion",
-  "Influencer",
-  "Usuario",
-  "Referidor",
-  "Representante Legal",
-  "Cobranza/Proveedores",
-  "Mutual - OC y Facturacion",
-  "Mutual - Ejecutivo de cuenta",
-  "Mutual - Ejecutivo de ventas",
-  "Administrador Tazki",
-  "Responsable IT",
-  "Stakeholders CS",
-  "Mutual - Prevencionista",
-].map((role) => ({ label: role, value: role }));
+export const CARGO_OPTIONS = [
+  { label: "Selecciona un cargo", value: "" },
+  { label: "Finanzas", value: "Finanzas" },
+  { label: "Administración", value: "Administración" },
+  { label: "Compras", value: "Compras" },
+  { label: "Facturación", value: "Facturación" },
+  { label: "Otro", value: "Otro" },
+];
 
-export const RESPONSABLE_IT_ROLE = "Responsable IT";
+export const COBRANZA_ROLE = "Cobranza/Proveedores";
+export const FACTURACION_ROLE = "Facturación";
+export const LEGAL_REPRESENTATIVE_ROLE = "Representante Legal";
 
 export const DEFAULT_FORM_REQUIRED_FIELDS = [
   "razonSocial",
@@ -116,13 +104,7 @@ export const DEFAULT_FORM_REQUIRED_FIELDS = [
   "direccionFacturacion",
   "comuna",
   "ciudadEmpresa",
-  "nombreCobranza",
-  "correoCobranza",
-  "telefonoCobranza",
   "existePlataformaProveedores",
-  "nombreFacturacion",
-  "correoFacturacion",
-  "telefonoFacturacion",
   "correoCasillaDTE",
   "nombreRepresentanteLegal",
   "rutRepresentanteLegal",

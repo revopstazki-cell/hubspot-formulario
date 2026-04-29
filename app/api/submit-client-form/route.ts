@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 
 import {
+  buildLegalRepresentativeContactDraft,
   getDealUpdatePayload,
+  withPrimaryContactDealFields,
   type ClientFormState,
 } from "@/lib/clientForm";
 import {
-  buildDerivedContactDrafts,
   getPersoneriaDealValue,
-  getResponsableITRoles,
   updateDeal,
   uploadFileToHubSpot,
   upsertContactForDeal,
 } from "@/lib/hubspot";
-import { DEAL_PROPERTY_MAP } from "@/lib/hubspotProperties";
+import {
+  COBRANZA_ROLE,
+  DEAL_PROPERTY_MAP,
+  FACTURACION_ROLE,
+} from "@/lib/hubspotProperties";
 
 export const runtime = "nodejs";
 
@@ -32,7 +36,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = JSON.parse(payloadRaw) as ClientFormState;
+    const payload = withPrimaryContactDealFields(
+      JSON.parse(payloadRaw) as ClientFormState,
+    );
 
     if (!payload.dealId) {
       return NextResponse.json(
@@ -56,16 +62,15 @@ export async function POST(request: Request) {
 
     await updateDeal(payload.dealId, dealProperties);
 
-    for (const derivedContact of buildDerivedContactDrafts(payload)) {
-      await upsertContactForDeal({
-        contact: derivedContact.draft,
-        dealId: payload.dealId,
-        roles: derivedContact.draft.tipoDeContacto,
-        mergeRoles: derivedContact.mergeRoles,
-      });
-    }
+    const representative = buildLegalRepresentativeContactDraft(payload);
+    await upsertContactForDeal({
+      contact: representative,
+      dealId: payload.dealId,
+      roles: representative.tipoDeContacto,
+      mergeRoles: true,
+    });
 
-    for (const contact of payload.responsablesIT) {
+    for (const contact of payload.cobranzaContacts) {
       if (!contact.firstname.trim() && !contact.selectedContactId && !contact.email.trim()) {
         continue;
       }
@@ -73,12 +78,12 @@ export async function POST(request: Request) {
       await upsertContactForDeal({
         contact,
         dealId: payload.dealId,
-        roles: getResponsableITRoles(contact),
+        roles: [COBRANZA_ROLE],
         mergeRoles: true,
       });
     }
 
-    for (const contact of payload.stakeholders) {
+    for (const contact of payload.facturacionContacts) {
       if (!contact.firstname.trim() && !contact.selectedContactId && !contact.email.trim()) {
         continue;
       }
@@ -86,7 +91,7 @@ export async function POST(request: Request) {
       await upsertContactForDeal({
         contact,
         dealId: payload.dealId,
-        roles: contact.tipoDeContacto,
+        roles: [FACTURACION_ROLE],
         mergeRoles: true,
       });
     }
