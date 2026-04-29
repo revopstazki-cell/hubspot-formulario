@@ -710,11 +710,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         ) : null}
       </FormSection>
 
-      <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
-        <div className="text-sm text-slate-500">
-          Los datos enviados actualizarán la información existente en HubSpot. Si
-          dejas un campo vacío, este puede sobrescribir el valor anterior.
-        </div>
+      <div className="flex justify-end rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <button
           type="submit"
           disabled={saving}
