@@ -1,16 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
 import { SelectInput } from "@/components/ficha-cliente/SelectInput";
 import { TextInput } from "@/components/ficha-cliente/TextInput";
-import { readJsonSafely } from "@/lib/clientApi";
-import {
-  mapHubSpotContactToDraft,
-  type ContactDraft,
-  type ContactSearchResult,
-} from "@/lib/clientForm";
+import type { ContactDraft } from "@/lib/clientForm";
 import type { PropertyOption } from "@/lib/hubspotProperties";
 
 type ContactFieldPrefix =
@@ -33,176 +26,6 @@ type ContactSectionProps = {
   createContact: () => ContactDraft;
 };
 
-type ContactSearchInputProps = {
-  contact: ContactDraft;
-  onSelect: (contact: ContactSearchResult) => void;
-  onClearSelection: () => void;
-};
-
-function contactDisplayName(
-  contact: Pick<ContactDraft | ContactSearchResult, "firstname" | "lastname" | "email">,
-) {
-  return [contact.firstname, contact.lastname].filter(Boolean).join(" ").trim();
-}
-
-function mergeTypeValues(values: string[], defaultValue: string) {
-  return Array.from(new Set([defaultValue, ...values].filter(Boolean)));
-}
-
-function ContactSearchInput({
-  contact,
-  onSelect,
-  onClearSelection,
-}: ContactSearchInputProps) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ContactSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [isChanging, setIsChanging] = useState(false);
-  const selectedLabel = contactDisplayName(contact) || contact.email;
-  const hasSelection = Boolean(contact.selectedContactId) && !isChanging;
-
-  useEffect(() => {
-    const trimmedQuery = query.trim();
-
-    if (hasSelection || trimmedQuery.length < 2) {
-      return;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(async () => {
-      setLoading(true);
-
-      try {
-        const response = await fetch(
-          `/api/contacts/search?q=${encodeURIComponent(trimmedQuery)}`,
-          { signal: controller.signal },
-        );
-        const data = await readJsonSafely<{
-          success: boolean;
-          results?: ContactSearchResult[];
-        }>(response);
-
-        if (!response.ok || !data?.success) {
-          setResults([]);
-          return;
-        }
-
-        setResults(data.results ?? []);
-      } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 250);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [hasSelection, query]);
-
-  if (hasSelection) {
-    return (
-      <div className="md:col-span-2">
-        <div className="rounded-2xl border border-violet-300 bg-violet-050 px-4 py-3 text-sm shadow-[0_12px_36px_rgba(63,30,201,0.06)]">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="font-extrabold text-neutral-900">
-                Contacto seleccionado desde HubSpot
-              </div>
-              <div className="mt-1 font-medium text-neutral-700">
-                {selectedLabel}
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsChanging(true);
-                  setQuery("");
-                  setResults([]);
-                }}
-                className="rounded-xl bg-violet-900 px-3 py-2 text-xs font-extrabold text-white shadow-[0_10px_24px_rgba(53,0,168,0.18)] transition hover:bg-violet-800"
-              >
-                Cambiar contacto
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsChanging(false);
-                  setQuery("");
-                  setResults([]);
-                  onClearSelection();
-                }}
-                className="rounded-xl border border-violet-300 bg-white px-3 py-2 text-xs font-extrabold text-violet-900 transition hover:bg-violet-000"
-              >
-                Limpiar selección
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative md:col-span-2">
-      <TextInput
-        label="Buscar contacto en HubSpot"
-        name="contactSearch"
-        value={query}
-        onChange={(value) => {
-          if (contact.selectedContactId) {
-            onClearSelection();
-          }
-
-          setQuery(value);
-
-          if (value.trim().length < 2) {
-            setResults([]);
-          }
-        }}
-        placeholder="Nombre, apellido o correo"
-      />
-
-      {query.trim().length >= 2 ? (
-        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-violet-200 bg-white shadow-[0_18px_60px_rgba(32,45,76,0.14)]">
-          {loading ? (
-            <div className="px-4 py-3 text-sm font-medium text-neutral-600">
-              Buscando...
-            </div>
-          ) : results.length > 0 ? (
-            results.map((contact) => (
-              <button
-                key={contact.id}
-                type="button"
-                onClick={() => {
-                  onSelect(contact);
-                  setIsChanging(false);
-                  setQuery("");
-                  setResults([]);
-                }}
-                className="block w-full border-b border-neutral-100 px-4 py-3 text-left text-sm transition hover:bg-violet-050 last:border-b-0"
-              >
-                <span className="block font-extrabold text-neutral-900">
-                  {contactDisplayName(contact) || "Sin nombre"}
-                </span>
-                <span className="block font-medium text-neutral-600">
-                  {contact.email || "Sin correo"}
-                </span>
-              </button>
-            ))
-          ) : (
-            <div className="px-4 py-3 text-sm font-medium text-neutral-600">
-              No encontramos contactos.
-            </div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export function ContactSection({
   title,
   note,
@@ -211,7 +34,6 @@ export function ContactSection({
   contacts,
   cargoOptions,
   typeOptions,
-  defaultTypeValue,
   showRut,
   errors,
   onChange,
@@ -225,25 +47,6 @@ export function ContactSection({
     onChange(
       contacts.map((contact) =>
         contact.localId === localId ? { ...contact, [key]: value } : contact,
-      ),
-    );
-  }
-
-  function updateContactFromSearch(localId: string, selected: ContactSearchResult) {
-    const mappedContact = mapHubSpotContactToDraft(selected);
-
-    onChange(
-      contacts.map((contact) =>
-        contact.localId === localId
-          ? {
-              ...mappedContact,
-              localId,
-              tipoDeContacto: mergeTypeValues(
-                mappedContact.tipoDeContacto,
-                defaultTypeValue,
-              ),
-            }
-          : contact,
       ),
     );
   }
@@ -293,11 +96,6 @@ export function ContactSection({
                 <h3 className="text-sm font-extrabold text-neutral-900">
                   Contacto {index + 1}
                 </h3>
-                {contact.selectedContactId ? (
-                  <p className="mt-1 text-xs font-medium text-neutral-600">
-                    HubSpot ID: {contact.selectedContactId}
-                  </p>
-                ) : null}
               </div>
               <button
                 type="button"
@@ -309,15 +107,6 @@ export function ContactSection({
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <ContactSearchInput
-                contact={contact}
-                onSelect={(selected) =>
-                  updateContactFromSearch(contact.localId, selected)
-                }
-                onClearSelection={() =>
-                  updateContact(contact.localId, "selectedContactId", "")
-                }
-              />
               <TextInput
                 label="Nombre"
                 name={`${fieldPrefix}-${index}-firstname`}

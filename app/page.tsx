@@ -21,7 +21,7 @@ export default function Home() {
               Ficha de cliente Tazki
             </h1>
             <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-[#404D6D] sm:text-lg">
-              Ingresa el ID del negocio para abrir la ficha conectada a HubSpot.
+              Ingresa el ID del negocio para abrir la ficha de cliente.
             </p>
 
             <form

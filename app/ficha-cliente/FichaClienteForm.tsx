@@ -113,7 +113,7 @@ const FIELD_LABELS: Record<string, string> = {
   frecuenciaSolicitudHES: "Frecuencia solicitud HES",
   frecuenciaSolicitudEDP: "Frecuencia solicitud EDP",
   legalContacts: "Contactos de Representante Legal",
-  formSave: "Guardado en HubSpot",
+  formSave: "Guardado de la ficha",
 };
 
 const CONTACT_SECTION_LABELS: Record<ContactListKey, string> = {

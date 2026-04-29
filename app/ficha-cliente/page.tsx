@@ -28,7 +28,7 @@ export default async function FichaClientePage({
       initialData = mapHubSpotDealToFormState(deal, associatedContacts);
     } catch (error) {
       console.error(error);
-      loadError = "No pudimos cargar la información del deal desde HubSpot.";
+      loadError = "No pudimos cargar la información inicial.";
     }
   }
 
@@ -49,8 +49,8 @@ export default async function FichaClientePage({
 
         {loadError ? (
           <div className="mb-8 rounded-3xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-medium text-rose-700 shadow-[0_16px_48px_rgba(32,45,76,0.08)]">
-            No pudimos precargar el deal desde HubSpot. Puedes seguir editando la
-            ficha manualmente.
+            No pudimos precargar la información. Puedes seguir editando la ficha
+            manualmente.
             <div className="mt-2 font-medium">{loadError}</div>
           </div>
         ) : null}

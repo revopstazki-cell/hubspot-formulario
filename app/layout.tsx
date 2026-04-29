@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HubSpot Formulario",
-  description: "Base inicial para una ficha cliente conectada a HubSpot",
+  title: "Ficha de Cliente Tazki",
+  description: "Formulario de ficha de cliente Tazki",
 };
 
 export default function RootLayout({
