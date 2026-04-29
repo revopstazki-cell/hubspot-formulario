@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
 import { ContactSection } from "@/components/ficha-cliente/ContactSection";
@@ -435,16 +436,19 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     <form onSubmit={handleSubmit} className="space-y-7">
       <div className="overflow-hidden rounded-[32px] border border-violet-200 bg-white/95 p-6 shadow-[0_24px_80px_rgba(32,45,76,0.10)] sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-violet-900 text-2xl font-black text-white shadow-[0_16px_36px_rgba(53,0,168,0.22)]">
-              t
-              <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-white bg-violet-400" />
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex w-fit shrink-0 rounded-3xl border border-violet-200 bg-white px-4 py-3 shadow-[0_16px_36px_rgba(53,0,168,0.10)]">
+              <Image
+                src="/tazki-logo.jpg"
+                alt="Tazki"
+                width={2029}
+                height={929}
+                priority
+                className="h-14 w-40 object-contain sm:w-48"
+              />
             </div>
             <div>
-              <p className="text-2xl font-black lowercase tracking-[-0.04em] text-violet-900">
-                tazki
-              </p>
-              <h1 className="mt-1 text-3xl font-black tracking-[-0.04em] text-neutral-900 sm:text-4xl">
+              <h1 className="text-3xl font-black tracking-[-0.04em] text-neutral-900 sm:text-4xl">
                 Ficha de cliente
               </h1>
               <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-neutral-700">
