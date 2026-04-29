@@ -7,6 +7,7 @@ import {
 } from "@/lib/clientForm";
 import {
   EMAIL_FORMAT_ERROR,
+  FIELD_REVIEW_ERROR,
   GENERAL_SAVE_ERROR,
   PHONE_FORMAT_ERROR,
   RUT_FORMAT_ERROR,
@@ -24,46 +25,98 @@ import {
 
 export const runtime = "nodejs";
 
+const DEAL_ERROR_FIELD_MAP: Record<string, string> = {
+  [DEAL_PROPERTY_MAP.razonSocial]: "razonSocial",
+  [DEAL_PROPERTY_MAP.rutEmpresa]: "rutEmpresa",
+  [DEAL_PROPERTY_MAP.giroEmpresa]: "giroEmpresa",
+  [DEAL_PROPERTY_MAP.fechaPublicacionEscritura]: "fechaPublicacionEscritura",
+  [DEAL_PROPERTY_MAP.notariaEscrituraPublica]: "notariaEscrituraPublica",
+  [DEAL_PROPERTY_MAP.direccionFacturacion]: "direccionFacturacion",
+  [DEAL_PROPERTY_MAP.comuna]: "comuna",
+  [DEAL_PROPERTY_MAP.ciudadEmpresa]: "ciudadEmpresa",
+  [DEAL_PROPERTY_MAP.existePlataformaProveedores]:
+    "existePlataformaProveedores",
+  [DEAL_PROPERTY_MAP.nombrePlataformaProveedores]:
+    "nombrePlataformaProveedores",
+  [DEAL_PROPERTY_MAP.comentarioPlataformaProveedores]:
+    "comentarioPlataformaProveedores",
+  [DEAL_PROPERTY_MAP.correoCasillaDTE]: "correoCasillaDTE",
+  [DEAL_PROPERTY_MAP.personeriaArchivo]: "personeriaFile",
+  [DEAL_PROPERTY_MAP.requerimientoFacturacion]: "requerimientoFacturacion",
+  [DEAL_PROPERTY_MAP.frecuenciaSolicitudOC]: "frecuenciaSolicitudOC",
+  [DEAL_PROPERTY_MAP.frecuenciaSolicitudMIGO]: "frecuenciaSolicitudMIGO",
+  [DEAL_PROPERTY_MAP.frecuenciaSolicitudHES]: "frecuenciaSolicitudHES",
+  [DEAL_PROPERTY_MAP.frecuenciaSolicitudEDP]: "frecuenciaSolicitudEDP",
+};
+
+const CONTACT_ERROR_FIELD_MAP: Record<string, string> = {
+  [CONTACT_PROPERTY_MAP.firstname]: "firstname",
+  [CONTACT_PROPERTY_MAP.lastname]: "lastname",
+  [CONTACT_PROPERTY_MAP.email]: "email",
+  [CONTACT_PROPERTY_MAP.phone]: "phone",
+  [CONTACT_PROPERTY_MAP.cargo]: "cargo",
+  [CONTACT_PROPERTY_MAP.tipoDeContacto]: "tipoDeContacto",
+  [CONTACT_PROPERTY_MAP.rutRepresentanteLegal]: "rutRepresentanteLegal",
+};
+
+function getMessageForProperty(propertyName: string) {
+  if (
+    propertyName === DEAL_PROPERTY_MAP.rutEmpresa ||
+    propertyName === CONTACT_PROPERTY_MAP.rutRepresentanteLegal
+  ) {
+    return RUT_FORMAT_ERROR;
+  }
+
+  if (
+    propertyName === CONTACT_PROPERTY_MAP.email ||
+    propertyName.includes("correo")
+  ) {
+    return EMAIL_FORMAT_ERROR;
+  }
+
+  if (
+    propertyName === CONTACT_PROPERTY_MAP.phone ||
+    propertyName.includes("telefono")
+  ) {
+    return PHONE_FORMAT_ERROR;
+  }
+
+  return FIELD_REVIEW_ERROR;
+}
+
 function mapErrorToFieldErrors(error: unknown, payload: ClientFormState | null) {
   const message =
     error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   const fieldErrors: Record<string, string> = {};
 
-  if (message.includes(DEAL_PROPERTY_MAP.rutEmpresa)) {
-    fieldErrors.rutEmpresa = RUT_FORMAT_ERROR;
-  }
-
-  if (message.includes(CONTACT_PROPERTY_MAP.rutRepresentanteLegal)) {
-    payload?.legalContacts.forEach((_, index) => {
-      fieldErrors[`legalContacts.${index}.rutRepresentanteLegal`] =
-        RUT_FORMAT_ERROR;
-    });
-  }
-
-  if (message.includes("email") || message.includes("correo")) {
-    for (const key of [
-      "cobranzaContacts",
-      "facturacionContacts",
-      "legalContacts",
-    ] as const) {
-      payload?.[key].forEach((contact, index) => {
-        if (contact.email.trim()) {
-          fieldErrors[`${key}.${index}.email`] = EMAIL_FORMAT_ERROR;
-        }
-      });
+  for (const [propertyName, fieldName] of Object.entries(DEAL_ERROR_FIELD_MAP)) {
+    if (message.includes(propertyName)) {
+      fieldErrors[fieldName] = getMessageForProperty(propertyName);
     }
   }
 
-  if (message.includes("phone") || message.includes("telefono")) {
+  for (const [propertyName, fieldName] of Object.entries(
+    CONTACT_ERROR_FIELD_MAP,
+  )) {
+    if (!message.includes(propertyName)) {
+      continue;
+    }
+
     for (const key of [
       "cobranzaContacts",
       "facturacionContacts",
       "legalContacts",
     ] as const) {
       payload?.[key].forEach((contact, index) => {
-        if (contact.phone.trim()) {
-          fieldErrors[`${key}.${index}.phone`] = PHONE_FORMAT_ERROR;
+        if (
+          propertyName === CONTACT_PROPERTY_MAP.rutRepresentanteLegal &&
+          key !== "legalContacts"
+        ) {
+          return;
         }
+
+        fieldErrors[`${key}.${index}.${fieldName}`] =
+          getMessageForProperty(propertyName);
       });
     }
   }

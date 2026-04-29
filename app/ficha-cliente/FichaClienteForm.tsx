@@ -91,6 +91,45 @@ const PROPERTY_REQUESTS: Record<
   frecuenciaEDP: { object: "deals", property: "frecuencia_solicitud_edp" },
 };
 
+const FIELD_LABELS: Record<string, string> = {
+  dealId: "ID del negocio",
+  razonSocial: "Razón social",
+  rutEmpresa: "RUT Empresa",
+  giroEmpresa: "Giro",
+  fechaPublicacionEscritura: "Fecha publicación escritura",
+  notariaEscrituraPublica: "Notaría escritura pública",
+  direccionFacturacion: "Dirección facturación",
+  comuna: "Comuna",
+  ciudadEmpresa: "Ciudad Empresa",
+  existePlataformaProveedores: "Existe plataforma de creación de proveedores",
+  nombrePlataformaProveedores: "Nombre plataforma creación de proveedores",
+  comentarioPlataformaProveedores: "Otra plataforma de proveedores",
+  correoCasillaDTE: "Correo casilla DTE",
+  personeriaFile: "Archivo de personería",
+  requerimientoFacturacion: "Requerimientos facturación",
+  frecuenciaSolicitudOC: "Frecuencia solicitud OC",
+  frecuenciaSolicitudMIGO: "Frecuencia solicitud MIGO",
+  frecuenciaSolicitudHES: "Frecuencia solicitud HES",
+  frecuenciaSolicitudEDP: "Frecuencia solicitud EDP",
+  legalContacts: "Contactos de Representante Legal",
+};
+
+const CONTACT_SECTION_LABELS: Record<ContactListKey, string> = {
+  cobranzaContacts: "Contactos de Cobranza / Proveedores",
+  facturacionContacts: "Contactos de Facturación",
+  legalContacts: "Contactos de Representante Legal",
+};
+
+const CONTACT_FIELD_LABELS: Partial<Record<keyof ContactDraft, string>> = {
+  firstname: "Nombre",
+  lastname: "Apellido",
+  email: "Correo",
+  phone: "Teléfono",
+  cargo: "Cargo",
+  rutRepresentanteLegal: "RUT representante legal",
+  tipoDeContacto: "Tipo de contacto",
+};
+
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -167,6 +206,31 @@ function withDefaultType(contact: ContactDraft, typeValue: string) {
       new Set([typeValue, ...contact.tipoDeContacto].filter(Boolean)),
     ),
   };
+}
+
+function getFieldLabel(errorKey: string) {
+  const contactMatch = errorKey.match(
+    /^(cobranzaContacts|facturacionContacts|legalContacts)\.(\d+)\.(.+)$/,
+  );
+
+  if (contactMatch) {
+    const [, sectionKey, index, fieldKey] = contactMatch;
+    const sectionLabel = CONTACT_SECTION_LABELS[sectionKey as ContactListKey];
+    const fieldLabel =
+      CONTACT_FIELD_LABELS[fieldKey as keyof ContactDraft] ?? fieldKey;
+
+    return `${sectionLabel}, contacto ${Number(index) + 1}: ${fieldLabel}`;
+  }
+
+  return FIELD_LABELS[errorKey] ?? errorKey;
+}
+
+function getFieldErrorSummary(errors: Record<string, string>) {
+  return Object.entries(errors).map(([key, message]) => ({
+    key,
+    label: getFieldLabel(key),
+    message,
+  }));
 }
 
 function mapSubmitFieldErrors(
@@ -321,6 +385,10 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     form.requerimientoFacturacion,
     propertyOptions.requerimientoFacturacion ?? [],
     ["EDP"],
+  );
+  const fieldErrorSummary = useMemo(
+    () => getFieldErrorSummary(fieldErrors),
+    [fieldErrors],
   );
 
   function updateField<K extends keyof ClientFormState>(
@@ -546,7 +614,22 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
         {errorMessage ? (
           <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-            {errorMessage}
+            <p>{errorMessage}</p>
+            {fieldErrorSummary.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-rose-100 bg-white/70 px-4 py-3">
+                <p className="font-extrabold text-rose-800">
+                  Campos a corregir:
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {fieldErrorSummary.map((error) => (
+                    <li key={error.key}>
+                      <span className="font-extrabold">{error.label}</span>
+                      <span>: {error.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -671,6 +754,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
               propertyOptions.nombrePlataforma ?? [],
               "Selecciona plataforma",
             )}
+            error={fieldErrors.nombrePlataformaProveedores}
           />
         ) : null}
         {showSupplierPlatform && showSupplierOther ? (
@@ -681,6 +765,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
             onChange={(value) =>
               updateField("comentarioPlataformaProveedores", value)
             }
+            error={fieldErrors.comentarioPlataformaProveedores}
           />
         ) : null}
       </FormSection>
@@ -749,6 +834,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
           options={propertyOptions.requerimientoFacturacion ?? []}
           values={form.requerimientoFacturacion}
           onChange={(values) => updateField("requerimientoFacturacion", values)}
+          error={fieldErrors.requerimientoFacturacion}
         />
         {hasRequirementOC ? (
           <SelectInput
@@ -760,6 +846,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
               propertyOptions.frecuenciaOC ?? [],
               "Selecciona frecuencia",
             )}
+            error={fieldErrors.frecuenciaSolicitudOC}
           />
         ) : null}
         {hasRequirementMIGO ? (
@@ -772,6 +859,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
               propertyOptions.frecuenciaMIGO ?? [],
               "Selecciona frecuencia",
             )}
+            error={fieldErrors.frecuenciaSolicitudMIGO}
           />
         ) : null}
         {hasRequirementHES ? (
@@ -784,6 +872,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
               propertyOptions.frecuenciaHES ?? [],
               "Selecciona frecuencia",
             )}
+            error={fieldErrors.frecuenciaSolicitudHES}
           />
         ) : null}
         {hasRequirementEDP ? (
@@ -796,6 +885,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
               propertyOptions.frecuenciaEDP ?? [],
               "Selecciona frecuencia",
             )}
+            error={fieldErrors.frecuenciaSolicitudEDP}
           />
         ) : null}
       </FormSection>
