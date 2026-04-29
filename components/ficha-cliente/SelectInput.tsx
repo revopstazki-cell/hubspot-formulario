@@ -14,6 +14,12 @@ type SelectInputProps = {
   error?: string;
 };
 
+const baseClassName =
+  "w-full rounded-2xl border border-neutral-300 bg-neutral-050/80 px-4 py-3.5 text-[15px] text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none transition focus:border-violet-700 focus:bg-white focus:ring-4 focus:ring-violet-200/70 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-500";
+
+const errorClassName =
+  "border-rose-300 bg-rose-50/50 focus:border-rose-400 focus:ring-rose-100";
+
 export function SelectInput({
   label,
   name,
@@ -24,6 +30,10 @@ export function SelectInput({
   disabled,
   error,
 }: SelectInputProps) {
+  const selectClassName = error
+    ? `${baseClassName} ${errorClassName}`
+    : baseClassName;
+
   return (
     <label className="flex flex-col gap-2">
       <span className="text-sm font-bold text-neutral-800">
@@ -35,7 +45,7 @@ export function SelectInput({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="w-full rounded-2xl border border-neutral-300 bg-neutral-050/80 px-4 py-3.5 text-[15px] text-neutral-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] outline-none transition focus:border-violet-700 focus:bg-white focus:ring-4 focus:ring-violet-200/70 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-500"
+        className={selectClassName}
       >
         {options.map((option) => (
           <option key={option.value || option.label} value={option.value}>

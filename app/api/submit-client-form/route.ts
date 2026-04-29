@@ -6,18 +6,74 @@ import {
   type ClientFormState,
 } from "@/lib/clientForm";
 import {
+  EMAIL_FORMAT_ERROR,
+  GENERAL_SAVE_ERROR,
+  PHONE_FORMAT_ERROR,
+  RUT_FORMAT_ERROR,
+} from "@/lib/formErrors";
+import {
   getPersoneriaDealValueForProperty,
   updateDeal,
   uploadFileToHubSpot,
   upsertContactForDeal,
 } from "@/lib/hubspot";
 import {
+  CONTACT_PROPERTY_MAP,
   DEAL_PROPERTY_MAP,
 } from "@/lib/hubspotProperties";
 
 export const runtime = "nodejs";
 
+function mapErrorToFieldErrors(error: unknown, payload: ClientFormState | null) {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const fieldErrors: Record<string, string> = {};
+
+  if (message.includes(DEAL_PROPERTY_MAP.rutEmpresa)) {
+    fieldErrors.rutEmpresa = RUT_FORMAT_ERROR;
+  }
+
+  if (message.includes(CONTACT_PROPERTY_MAP.rutRepresentanteLegal)) {
+    payload?.legalContacts.forEach((_, index) => {
+      fieldErrors[`legalContacts.${index}.rutRepresentanteLegal`] =
+        RUT_FORMAT_ERROR;
+    });
+  }
+
+  if (message.includes("email") || message.includes("correo")) {
+    for (const key of [
+      "cobranzaContacts",
+      "facturacionContacts",
+      "legalContacts",
+    ] as const) {
+      payload?.[key].forEach((contact, index) => {
+        if (contact.email.trim()) {
+          fieldErrors[`${key}.${index}.email`] = EMAIL_FORMAT_ERROR;
+        }
+      });
+    }
+  }
+
+  if (message.includes("phone") || message.includes("telefono")) {
+    for (const key of [
+      "cobranzaContacts",
+      "facturacionContacts",
+      "legalContacts",
+    ] as const) {
+      payload?.[key].forEach((contact, index) => {
+        if (contact.phone.trim()) {
+          fieldErrors[`${key}.${index}.phone`] = PHONE_FORMAT_ERROR;
+        }
+      });
+    }
+  }
+
+  return fieldErrors;
+}
+
 export async function POST(request: Request) {
+  let payload: ClientFormState | null = null;
+
   try {
     const formData = await request.formData();
     const payloadRaw = formData.get("payload");
@@ -27,13 +83,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "No recibimos el payload del formulario.",
+          error: GENERAL_SAVE_ERROR,
         },
         { status: 400 },
       );
     }
 
-    const payload = withPrimaryContactDealFields(
+    payload = withPrimaryContactDealFields(
       JSON.parse(payloadRaw) as ClientFormState,
     );
 
@@ -41,7 +97,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Falta el ID del negocio.",
+          error: GENERAL_SAVE_ERROR,
         },
         { status: 400 },
       );
@@ -82,13 +138,13 @@ export async function POST(request: Request) {
       message: "Ficha de cliente enviada correctamente",
     });
   } catch (error) {
+    console.error(error);
+
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "No pudimos guardar la ficha de cliente.",
+        error: GENERAL_SAVE_ERROR,
+        fieldErrors: mapErrorToFieldErrors(error, payload),
       },
       { status: 500 },
     );

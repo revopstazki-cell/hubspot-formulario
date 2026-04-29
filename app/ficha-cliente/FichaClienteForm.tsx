@@ -9,12 +9,20 @@ import { FileUpload } from "@/components/ficha-cliente/FileUpload";
 import { FormSection } from "@/components/ficha-cliente/FormSection";
 import { SelectInput } from "@/components/ficha-cliente/SelectInput";
 import { TextInput } from "@/components/ficha-cliente/TextInput";
+import { readJsonSafely } from "@/lib/clientApi";
 import {
   createEmptyContactDraft,
   withPrimaryContactDealFields,
   type ClientFormState,
   type ContactDraft,
 } from "@/lib/clientForm";
+import {
+  EMAIL_FORMAT_ERROR,
+  GENERAL_SAVE_ERROR,
+  PHONE_FORMAT_ERROR,
+  REQUIRED_FIELD_ERROR,
+  RUT_FORMAT_ERROR,
+} from "@/lib/formErrors";
 import {
   COBRANZA_ROLE,
   DEFAULT_FORM_REQUIRED_FIELDS,
@@ -43,6 +51,18 @@ type OptionKey =
   | "frecuenciaMIGO"
   | "frecuenciaHES"
   | "frecuenciaEDP";
+
+type PropertyOptionsResponse = {
+  success: boolean;
+  options?: PropertyOption[];
+};
+
+type SubmitResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -149,6 +169,63 @@ function withDefaultType(contact: ContactDraft, typeValue: string) {
   };
 }
 
+function mapSubmitFieldErrors(
+  result: SubmitResponse | null,
+  currentForm: ClientFormState,
+) {
+  const errors: Record<string, string> = {};
+
+  if (result?.fieldErrors) {
+    Object.assign(errors, result.fieldErrors);
+  }
+
+  const apiMessage = `${result?.error ?? ""} ${result?.message ?? ""}`.toLowerCase();
+
+  if (apiMessage.includes("rut_empresa")) {
+    errors.rutEmpresa = RUT_FORMAT_ERROR;
+  }
+
+  if (apiMessage.includes("rut_representante_legal")) {
+    currentForm.legalContacts.forEach((_, index) => {
+      errors[`legalContacts.${index}.rutRepresentanteLegal`] = RUT_FORMAT_ERROR;
+    });
+  }
+
+  if (apiMessage.includes("correo_casilla_dte")) {
+    errors.correoCasillaDTE = EMAIL_FORMAT_ERROR;
+  }
+
+  if (apiMessage.includes("email")) {
+    for (const key of [
+      "cobranzaContacts",
+      "facturacionContacts",
+      "legalContacts",
+    ] as ContactListKey[]) {
+      currentForm[key].forEach((contact, index) => {
+        if (contact.email.trim()) {
+          errors[`${key}.${index}.email`] = EMAIL_FORMAT_ERROR;
+        }
+      });
+    }
+  }
+
+  if (apiMessage.includes("phone") || apiMessage.includes("telefono")) {
+    for (const key of [
+      "cobranzaContacts",
+      "facturacionContacts",
+      "legalContacts",
+    ] as ContactListKey[]) {
+      currentForm[key].forEach((contact, index) => {
+        if (contact.phone.trim()) {
+          errors[`${key}.${index}.phone`] = PHONE_FORMAT_ERROR;
+        }
+      });
+    }
+  }
+
+  return errors;
+}
+
 export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
   const [form, setForm] = useState<ClientFormState>(initialData);
   const [propertyOptions, setPropertyOptions] = useState<
@@ -174,10 +251,11 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
             const response = await fetch(
               `/api/hubspot/property-options?${params.toString()}`,
             );
-            const data = (await response.json()) as {
-              success: boolean;
-              options?: PropertyOption[];
-            };
+            const data = await readJsonSafely<PropertyOptionsResponse>(response);
+
+            if (!response.ok || !data?.success) {
+              return [key, []] as const;
+            }
 
             return [key, data.options ?? []] as const;
           } catch {
@@ -280,12 +358,11 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         errors[`${key}.${index}.email`] =
           "Agrega correo o selecciona un contacto existente.";
       } else if (contact.email.trim() && !isValidEmail(contact.email.trim())) {
-        errors[`${key}.${index}.email`] = "Ingresa un correo valido.";
+        errors[`${key}.${index}.email`] = EMAIL_FORMAT_ERROR;
       }
 
       if (contact.phone.trim() && !isValidInternationalPhone(contact.phone.trim())) {
-        errors[`${key}.${index}.phone`] =
-          "Usa formato internacional, por ejemplo +56912345678.";
+        errors[`${key}.${index}.phone`] = PHONE_FORMAT_ERROR;
       }
     }
   }
@@ -315,15 +392,22 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
     for (const key of DEFAULT_FORM_REQUIRED_FIELDS) {
       if (!String(normalizedForm[key] ?? "").trim()) {
-        errors[key] = "Este campo es obligatorio.";
+        errors[key] = REQUIRED_FIELD_ERROR;
       }
+    }
+
+    if (
+      normalizedForm.rutEmpresa.trim() &&
+      !isValidRut(normalizedForm.rutEmpresa)
+    ) {
+      errors.rutEmpresa = RUT_FORMAT_ERROR;
     }
 
     if (
       normalizedForm.correoCasillaDTE.trim() &&
       !isValidEmail(normalizedForm.correoCasillaDTE.trim())
     ) {
-      errors.correoCasillaDTE = "Ingresa un correo valido.";
+      errors.correoCasillaDTE = EMAIL_FORMAT_ERROR;
     }
 
     validateContactList("cobranzaContacts", form.cobranzaContacts, errors);
@@ -337,7 +421,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     for (const [index, contact] of form.legalContacts.entries()) {
       if (!contact.firstname.trim()) {
         errors[`legalContacts.${index}.firstname`] =
-          "El nombre es obligatorio.";
+          REQUIRED_FIELD_ERROR;
       }
 
       if (!contact.selectedContactId && !contact.email.trim()) {
@@ -347,10 +431,9 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
       if (!contact.rutRepresentanteLegal.trim()) {
         errors[`legalContacts.${index}.rutRepresentanteLegal`] =
-          "El RUT del representante legal es obligatorio.";
+          REQUIRED_FIELD_ERROR;
       } else if (!isValidRut(contact.rutRepresentanteLegal)) {
-        errors[`legalContacts.${index}.rutRepresentanteLegal`] =
-          "Ingresa un RUT valido, por ejemplo 12.345.678-9.";
+        errors[`legalContacts.${index}.rutRepresentanteLegal`] = RUT_FORMAT_ERROR;
       }
     }
 
@@ -370,7 +453,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
     setSuccessMessage("");
 
     if (Object.keys(errors).length > 0) {
-      setErrorMessage("Revisa los campos antes de enviar.");
+      setErrorMessage(GENERAL_SAVE_ERROR);
       return;
     }
 
@@ -407,16 +490,13 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
         body,
       });
 
-      const result = (await response.json()) as {
-        success: boolean;
-        message?: string;
-        error?: string;
-      };
+      const result = await readJsonSafely<SubmitResponse>(response);
 
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.error || result.message || "No pudimos guardar la ficha.",
-        );
+      if (!response.ok || !result?.success) {
+        const apiFieldErrors = mapSubmitFieldErrors(result, normalizedForm);
+        setFieldErrors((current) => ({ ...current, ...apiFieldErrors }));
+        setErrorMessage(GENERAL_SAVE_ERROR);
+        return;
       }
 
       setSuccessMessage("Ficha de cliente enviada correctamente");
@@ -424,9 +504,8 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
       setForm(normalizedForm);
       setPersoneriaFile(null);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "No pudimos guardar la ficha.",
-      );
+      console.error(error);
+      setErrorMessage(GENERAL_SAVE_ERROR);
     } finally {
       setSaving(false);
     }

@@ -59,8 +59,17 @@ function getHubSpotHeaders(isMultipart = false) {
 }
 
 async function parseHubSpotResponse(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  let data: unknown = null;
+
+  if (text && contentType.toLowerCase().includes("application/json")) {
+    try {
+      data = JSON.parse(text) as unknown;
+    } catch {
+      data = null;
+    }
+  }
 
   if (!response.ok) {
     const message =
@@ -69,9 +78,13 @@ async function parseHubSpotResponse(response: Response) {
       "message" in data &&
       typeof data.message === "string"
         ? data.message
-        : "HubSpot devolvio un error.";
+        : "HubSpot devolvió un error.";
 
     throw new Error(message);
+  }
+
+  if (text && !contentType.toLowerCase().includes("application/json")) {
+    throw new Error("HubSpot no devolvió una respuesta válida.");
   }
 
   return data;

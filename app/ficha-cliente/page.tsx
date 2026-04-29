@@ -27,10 +27,8 @@ export default async function FichaClientePage({
       const { deal, associatedContacts } = await getDealById(dealId);
       initialData = mapHubSpotDealToFormState(deal, associatedContacts);
     } catch (error) {
-      loadError =
-        error instanceof Error
-          ? error.message
-          : "No pudimos cargar la informacion del deal desde HubSpot.";
+      console.error(error);
+      loadError = "No pudimos cargar la información del deal desde HubSpot.";
     }
   }
 

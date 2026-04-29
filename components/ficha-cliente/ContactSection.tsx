@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { CheckboxGroup } from "@/components/ficha-cliente/CheckboxGroup";
 import { SelectInput } from "@/components/ficha-cliente/SelectInput";
 import { TextInput } from "@/components/ficha-cliente/TextInput";
+import { readJsonSafely } from "@/lib/clientApi";
 import {
   mapHubSpotContactToDraft,
   type ContactDraft,
@@ -76,10 +77,15 @@ function ContactSearchInput({
           `/api/contacts/search?q=${encodeURIComponent(trimmedQuery)}`,
           { signal: controller.signal },
         );
-        const data = (await response.json()) as {
+        const data = await readJsonSafely<{
           success: boolean;
           results?: ContactSearchResult[];
-        };
+        }>(response);
+
+        if (!response.ok || !data?.success) {
+          setResults([]);
+          return;
+        }
 
         setResults(data.results ?? []);
       } catch {
