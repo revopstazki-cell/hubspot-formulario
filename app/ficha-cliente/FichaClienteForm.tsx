@@ -597,7 +597,7 @@ export function FichaClienteForm({ initialData }: FichaClienteFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-7">
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#3500A8] to-[#5C62DE] p-6 text-white shadow-[0_24px_80px_rgba(53,0,168,0.24)] sm:p-8">
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#5C62DE] to-[#9094F0] p-6 text-white shadow-[0_24px_80px_rgba(92,98,222,0.20)] sm:p-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl">
             <div className="mb-6 flex w-fit rounded-2xl border border-white/25 bg-white/95 px-4 py-3 shadow-[0_16px_36px_rgba(32,45,76,0.12)]">

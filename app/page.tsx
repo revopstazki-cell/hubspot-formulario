@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#EBEBFF,#FBFBFF_42%,#F8FAFF_100%)] px-4 py-10 text-[#212121]">
       <section className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-4xl flex-col justify-center">
-        <div className="overflow-hidden rounded-[32px] bg-gradient-to-br from-[#3500A8] to-[#5C62DE] p-1 shadow-[0_28px_90px_rgba(53,0,168,0.22)]">
+        <div className="overflow-hidden rounded-[32px] bg-gradient-to-br from-[#5C62DE] to-[#9094F0] p-1 shadow-[0_28px_90px_rgba(92,98,222,0.20)]">
           <div className="rounded-[28px] bg-white/95 p-6 sm:p-10">
             <div className="flex w-fit rounded-2xl border border-[#D9DBFF] bg-white px-4 py-3 shadow-[0_18px_44px_rgba(32,45,76,0.12)]">
               <Image
